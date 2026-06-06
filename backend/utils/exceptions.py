@@ -1,0 +1,1 @@
+from .permissions import custom_exception_handler
