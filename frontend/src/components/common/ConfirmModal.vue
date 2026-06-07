@@ -13,15 +13,17 @@
         <p class="text-slate-600">{{ message }}</p>
       </div>
       <div class="modal-footer">
-        <button @click="$emit('cancel')" class="btn-md btn-secondary">Отмена</button>
+        <button @click="$emit('cancel')" class="btn-md btn-secondary">{{ t('common.cancel') }}</button>
         <button @click="$emit('confirm')" :class="['btn-md', confirmClass || 'btn-primary']">
-          {{ confirmLabel || 'Подтвердить' }}
+          {{ confirmLabel || t('common.confirm') }}
         </button>
       </div>
     </div>
   </div>
 </template>
 <script setup>
+import { useI18n } from '@/i18n'
 defineProps({ title: String, message: String, confirmLabel: String, confirmClass: String })
 defineEmits(['confirm', 'cancel'])
+const { t } = useI18n()
 </script>

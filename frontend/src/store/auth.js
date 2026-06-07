@@ -15,7 +15,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isMaster = computed(() => user.value?.role === 'master')
   const isOperator = computed(() => user.value?.role === 'operator')
   const canWrite = computed(() => ['admin', 'master'].includes(user.value?.role))
-  const userFullName = computed(() => user.value?.full_name || user.value?.username || '')
+  const userFullName = computed(() => user.value?.first_name || user.value?.username || '')
   const userRole = computed(() => user.value?.role_display || '')
 
   async function login(credentials) {

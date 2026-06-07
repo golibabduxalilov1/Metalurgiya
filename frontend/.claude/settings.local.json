@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python skills/ui-ux-pro-max/scripts/search.py \"machine registry industrial SaaS dashboard admin panel premium light\" --design-system -p \"MachineRegistry\")",
+      "Read(//c/Users/Mr_Moon/.claude/skills/ui-ux-pro-max/**)",
+      "Bash(python scripts/search.py \"enterprise SaaS dashboard login authentication professional light\" --design-system -p \"Machine Registry\" -f markdown)"
+    ]
+  }
+}

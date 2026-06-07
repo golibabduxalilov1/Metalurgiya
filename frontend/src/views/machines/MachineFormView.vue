@@ -1,140 +1,242 @@
 <template>
   <div class="animate-fade-in max-w-4xl mx-auto">
+
     <!-- Header -->
-    <div class="flex items-center gap-4 mb-6">
-      <button @click="$router.back()" class="p-2 rounded-lg text-slate-500 hover:bg-slate-200 transition-colors">
+    <div class="flex items-center gap-4 mb-7">
+      <button @click="$router.back()"
+        class="p-2 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-100
+               border border-transparent hover:border-slate-200
+               transition-all duration-200 cursor-pointer flex-shrink-0">
         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
         </svg>
       </button>
       <div>
-        <h1 class="page-title">{{ isEdit ? 'Редактировать станок' : 'Добавить станок' }}</h1>
-        <p class="page-subtitle">{{ isEdit ? `Инв. № ${route.params.id}` : 'Новая запись в реестре' }}</p>
+        <h1 class="page-title">{{ isEdit ? t('machines.form_title_edit') : t('machines.form_title_add') }}</h1>
+        <p v-if="isEdit" class="page-subtitle flex items-center gap-1.5 mt-0.5">
+          {{ t('machines.form_inv_prefix') }}
+          <span class="font-mono text-xs font-semibold text-indigo-700
+                       bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">
+            {{ route.params.id }}
+          </span>
+        </p>
+        <p v-else class="page-subtitle">{{ t('machines.form_new_record') }}</p>
       </div>
     </div>
 
     <form @submit.prevent="handleSubmit" class="space-y-6">
+
       <!-- Main info -->
       <div class="card p-6">
-        <h2 class="text-sm font-semibold text-slate-700 mb-5 pb-3 border-b border-slate-100">
-          Основная информация
-        </h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="section-header mb-5 pb-4 border-b border-slate-100">
+          <div class="section-icon bg-indigo-50">
+            <svg class="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+          </div>
+          <h2 class="section-title">{{ t('machines.form_basic') }}</h2>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div class="md:col-span-2">
-            <label class="form-label">Наименование <span class="text-red-500">*</span></label>
-            <input v-model="form.name" type="text" class="form-input" placeholder="Токарный станок 16К20" required />
-            <div v-if="errors.name" class="form-error">{{ errors.name }}</div>
+            <label class="form-label">
+              {{ t('machines.form_name') }} <span class="text-rose-500">*</span>
+            </label>
+            <input v-model="form.name" type="text"
+              :class="['form-input', errors.name ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-500/20' : '']"
+              :placeholder="t('machines.form_ph_name')" required />
+            <div v-if="errors.name" class="form-error">
+              <svg class="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              {{ errors.name }}
+            </div>
           </div>
 
           <div>
-            <label class="form-label">Инвентарный номер <span class="text-red-500">*</span></label>
-            <input v-model="form.inventory_number" type="text" class="form-input font-mono"
-              placeholder="ИНВ-001" required />
-            <div v-if="errors.inventory_number" class="form-error">{{ errors.inventory_number }}</div>
+            <label class="form-label">
+              {{ t('machines.form_inv') }} <span class="text-rose-500">*</span>
+            </label>
+            <input v-model="form.inventory_number" type="text"
+              :class="['form-input font-mono tracking-wide', errors.inventory_number ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-500/20' : '']"
+              :placeholder="t('machines.form_ph_inv')" required />
+            <div v-if="errors.inventory_number" class="form-error">
+              <svg class="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              {{ errors.inventory_number }}
+            </div>
           </div>
 
           <div>
-            <label class="form-label">Тип станка</label>
-            <select v-model="form.machine_type" class="form-select">
-              <option value="">— не выбрано —</option>
-              <option v-for="t in types" :key="t.id" :value="t.id">{{ t.name }}</option>
-            </select>
+            <label class="form-label">{{ t('machines.form_type') }}</label>
+            <div class="relative">
+              <select v-model="form.machine_type" class="form-select pr-8 appearance-none cursor-pointer">
+                <option value="">{{ t('common.not_selected') }}</option>
+                <option v-for="tp in types" :key="tp.id" :value="tp.id">{{ tp.name }}</option>
+              </select>
+              <svg class="select-chevron text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </div>
           </div>
 
           <div>
-            <label class="form-label">Модель</label>
+            <label class="form-label">{{ t('machines.form_model') }}</label>
             <input v-model="form.model" type="text" class="form-input" placeholder="16К20" />
           </div>
 
           <div>
-            <label class="form-label">Производитель</label>
-            <input v-model="form.manufacturer" type="text" class="form-input" placeholder="Красный Пролетарий" />
+            <label class="form-label">{{ t('machines.form_manufacturer') }}</label>
+            <input v-model="form.manufacturer" type="text" class="form-input" />
           </div>
 
           <div>
-            <label class="form-label">Год выпуска</label>
+            <label class="form-label">{{ t('machines.form_year') }}</label>
             <input v-model="form.year_manufactured" type="number" class="form-input"
               placeholder="2020" min="1900" :max="currentYear" />
           </div>
 
           <div>
-            <label class="form-label">Дата ввода в эксплуатацию</label>
+            <label class="form-label">{{ t('machines.form_commissioned') }}</label>
             <input v-model="form.commissioned_date" type="date" class="form-input" />
           </div>
         </div>
 
-        <div class="mt-4">
-          <label class="form-label">Описание / Комментарий</label>
+        <div class="mt-5 pt-5 border-t border-slate-100">
+          <label class="form-label">{{ t('machines.form_desc') }}</label>
           <textarea v-model="form.description" class="form-textarea" rows="3"
-            placeholder="Дополнительная информация о станке..."></textarea>
+            :placeholder="t('machines.form_desc_ph')"></textarea>
         </div>
       </div>
 
       <!-- Location -->
       <div class="card p-6">
-        <h2 class="text-sm font-semibold text-slate-700 mb-5 pb-3 border-b border-slate-100">
-          Расположение
-        </h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="section-header mb-5 pb-4 border-b border-slate-100">
+          <div class="section-icon bg-emerald-50">
+            <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+          </div>
+          <h2 class="section-title">{{ t('machines.form_location') }}</h2>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
           <div>
-            <label class="form-label">Цех</label>
-            <select v-model="form.workshop" @change="onWorkshopChange" class="form-select">
-              <option value="">— не выбрано —</option>
-              <option v-for="w in workshops" :key="w.id" :value="w.id">{{ w.name }}</option>
-            </select>
+            <label class="form-label">{{ t('machines.form_workshop') }}</label>
+            <div class="relative">
+              <select v-model="form.workshop" @change="onWorkshopChange"
+                class="form-select pr-8 appearance-none cursor-pointer">
+                <option value="">{{ t('common.not_selected') }}</option>
+                <option v-for="w in workshops" :key="w.id" :value="w.id">{{ w.name }}</option>
+              </select>
+              <svg class="select-chevron text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </div>
           </div>
           <div>
-            <label class="form-label">Участок</label>
-            <select v-model="form.section" class="form-select" :disabled="!form.workshop">
-              <option value="">— не выбрано —</option>
-              <option v-for="s in filteredSections" :key="s.id" :value="s.id">{{ s.name }}</option>
-            </select>
+            <label class="form-label">
+              {{ t('machines.form_section') }}
+              <span v-if="!form.workshop" class="text-xs font-normal text-slate-400 ml-1">{{ t('machines.form_section_hint') }}</span>
+            </label>
+            <div class="relative">
+              <select v-model="form.section" :disabled="!form.workshop"
+                class="form-select pr-8 appearance-none
+                       disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed">
+                <option value="">{{ t('common.not_selected') }}</option>
+                <option v-for="s in filteredSections" :key="s.id" :value="s.id">{{ s.name }}</option>
+              </select>
+              <svg class="select-chevron" :class="!form.workshop ? 'text-slate-300' : 'text-slate-400'"
+                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </div>
           </div>
           <div>
-            <label class="form-label">Рабочее место</label>
-            <input v-model="form.workplace" type="text" class="form-input" placeholder="РМ-5" />
+            <label class="form-label">{{ t('machines.form_workplace') }}</label>
+            <input v-model="form.workplace" type="text" class="form-input" :placeholder="t('machines.form_ph_workplace')" />
           </div>
         </div>
       </div>
 
       <!-- Status & operator -->
       <div class="card p-6">
-        <h2 class="text-sm font-semibold text-slate-700 mb-5 pb-3 border-b border-slate-100">
-          Статус и оператор
-        </h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="section-header mb-5 pb-4 border-b border-slate-100">
+          <div class="section-icon bg-amber-50">
+            <svg class="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+          </div>
+          <h2 class="section-title">{{ t('machines.form_status_op') }}</h2>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div>
-            <label class="form-label">Текущий статус</label>
-            <select v-model="form.current_status" class="form-select">
-              <option value="">— не задан —</option>
-              <option v-for="s in statuses" :key="s.id" :value="s.id">{{ s.name }}</option>
-            </select>
+            <label class="form-label">{{ t('machines.form_status') }}</label>
+            <div class="relative">
+              <select v-model="form.current_status" class="form-select pr-8 appearance-none cursor-pointer">
+                <option value="">{{ t('common.not_defined') }}</option>
+                <option v-for="s in statuses" :key="s.id" :value="s.id">{{ s.name }}</option>
+              </select>
+              <svg class="select-chevron text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </div>
           </div>
           <div>
-            <label class="form-label">Оператор</label>
-            <select v-model="form.assigned_operator" class="form-select">
-              <option value="">— не назначен —</option>
-              <option v-for="e in employees" :key="e.id" :value="e.id">{{ e.full_name }}</option>
-            </select>
+            <label class="form-label">{{ t('machines.form_operator') }}</label>
+            <div class="relative">
+              <select v-model="form.assigned_operator" class="form-select pr-8 appearance-none cursor-pointer">
+                <option value="">{{ t('machines.form_not_assigned') }}</option>
+                <option v-for="e in employees" :key="e.id" :value="e.id">{{ e.first_name }}</option>
+              </select>
+              <svg class="select-chevron text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </div>
           </div>
-          <div>
-            <label class="form-label">Бригада (если нет конкретного оператора)</label>
-            <input v-model="form.assigned_brigade" type="text" class="form-input" placeholder="Бригада №3" />
+          <div class="md:col-span-2">
+            <label class="form-label">
+              {{ t('machines.form_brigade') }}
+              <span class="text-xs font-normal text-slate-400 ml-1">{{ t('machines.form_brigade_hint') }}</span>
+            </label>
+            <input v-model="form.assigned_brigade" type="text" class="form-input" />
           </div>
         </div>
       </div>
 
       <!-- Actions -->
-      <div class="flex items-center justify-end gap-3">
-        <button type="button" @click="$router.back()" class="btn-md btn-secondary">Отмена</button>
-        <button type="submit" :disabled="saving" class="btn-md btn-primary">
+      <div class="flex items-center justify-between pt-1 pb-2">
+        <button type="button" @click="$router.back()"
+          class="btn-md btn-secondary inline-flex items-center gap-2
+                 hover:border-slate-300 transition-all duration-200">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+          </svg>
+          {{ t('common.cancel') }}
+        </button>
+        <button type="submit" :disabled="saving"
+          class="btn-md btn-primary min-w-[140px] sm:min-w-[180px] shadow-lg shadow-indigo-500/25
+                 hover:shadow-indigo-500/40 hover:-translate-y-px
+                 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0
+                 transition-all duration-200">
           <svg v-if="saving" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
           </svg>
-          {{ saving ? 'Сохранение...' : (isEdit ? 'Сохранить изменения' : 'Добавить станок') }}
+          <svg v-else class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+          </svg>
+          {{ saving ? t('common.saving') : (isEdit ? t('machines.form_save_changes') : t('machines.add')) }}
         </button>
       </div>
+
     </form>
   </div>
 </template>
@@ -144,10 +246,12 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'vue-toastification'
 import { machinesApi, machineTypesApi, statusesApi, workshopsApi, employeesApi } from '@/api'
+import { useI18n } from '@/i18n'
 
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const { t } = useI18n()
 
 const isEdit = computed(() => !!route.params.id && route.name === 'MachineEdit')
 const currentYear = new Date().getFullYear()
@@ -216,7 +320,7 @@ async function loadMachine() {
       assigned_brigade: m.assigned_brigade || '',
     })
   } catch {
-    toast.error('Ошибка загрузки данных')
+    toast.error(t('toast.load_data_error'))
     router.push('/machines')
   }
 }
@@ -234,20 +338,20 @@ async function handleSubmit() {
   try {
     if (isEdit.value) {
       await machinesApi.update(route.params.id, payload)
-      toast.success('Станок обновлён')
+      toast.success(t('toast.machine_updated'))
       router.push(`/machines/${route.params.id}`)
     } else {
       const res = await machinesApi.create(payload)
-      toast.success('Станок добавлен')
+      toast.success(t('toast.machine_added'))
       router.push(`/machines/${res.data.id}`)
     }
   } catch (e) {
     const data = e.response?.data
     if (data?.errors) {
       errors.value = data.errors
-      toast.error('Проверьте заполнение формы')
+      toast.error(t('toast.form_check'))
     } else {
-      toast.error(data?.message || 'Ошибка сохранения')
+      toast.error(data?.message || t('toast.error'))
     }
   } finally {
     saving.value = false
@@ -259,3 +363,26 @@ onMounted(async () => {
   await loadMachine()
 })
 </script>
+
+<style scoped>
+/* ── Section header ── */
+.section-header {
+  @apply flex items-center gap-3;
+}
+.section-icon {
+  @apply w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0;
+}
+.section-title {
+  @apply text-sm font-semibold text-slate-700;
+}
+
+/* ── Custom select chevron ── */
+.select-chevron {
+  @apply absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none;
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .btn-md, .btn-sm { transition: none; }
+}
+</style>
