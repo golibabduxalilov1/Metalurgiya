@@ -1,12 +1,15 @@
 """
 Utils - Permissions, Pagination, Middleware, Validators, Exceptions
 """
+import logging
 import re
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import permissions, pagination, status
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import exception_handler
+
+logger = logging.getLogger('django')
 
 
 # ============================================================
@@ -117,6 +120,19 @@ def custom_exception_handler(exc, context):
         exc = ValidationError(detail=exc.messages)
 
     response = exception_handler(exc, context)
+
+    request = context.get('request')
+    view = context.get('view')
+    user = getattr(request, 'user', None)
+    log_extra = (
+        f"path={getattr(request, 'path', '?')} "
+        f"method={getattr(request, 'method', '?')} "
+        f"view={view.__class__.__name__ if view else '?'} "
+        f"user={user if user and getattr(user, 'is_authenticated', False) else 'anonymous'}"
+    )
+
+    if response is None or response.status_code >= 500:
+        logger.error('API exception: %s | %s', exc, log_extra, exc_info=exc)
 
     if response is not None:
         error_data = {

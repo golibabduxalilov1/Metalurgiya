@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import status, generics, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
@@ -131,9 +132,24 @@ class UserViewSet(viewsets.ModelViewSet):
             )
         return queryset
 
+    @staticmethod
+    def _ensure_can_modify(request, target_user):
+        """Администратор не может выполнять действия над другим администратором"""
+        if target_user.role == 'admin' and target_user != request.user:
+            raise PermissionDenied('Администратор не может выполнять действия над другим администратором')
+
+    def update(self, request, *args, **kwargs):
+        self._ensure_can_modify(request, self.get_object())
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        self._ensure_can_modify(request, self.get_object())
+        return super().partial_update(request, *args, **kwargs)
+
     def destroy(self, request, *args, **kwargs):
         """Деактивация вместо удаления"""
         user = self.get_object()
+        self._ensure_can_modify(request, user)
         user.is_active = False
         user.save()
         return Response({'detail': 'Пользователь деактивирован'}, status=status.HTTP_200_OK)
@@ -143,6 +159,7 @@ class UserViewSet(viewsets.ModelViewSet):
     def reset_password(self, request, pk=None):
         """Сброс пароля пользователя (только admin)"""
         user = self.get_object()
+        self._ensure_can_modify(request, user)
         new_password = request.data.get('new_password')
         if not new_password:
             return Response({'detail': 'Новый пароль обязателен'}, status=status.HTTP_400_BAD_REQUEST)
@@ -154,6 +171,7 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def activate(self, request, pk=None):
         user = self.get_object()
+        self._ensure_can_modify(request, user)
         user.is_active = True
         user.save()
         return Response({'detail': 'Пользователь активирован'})

@@ -101,26 +101,29 @@
           <div class="mt-2 ml-11 flex items-center justify-between gap-2">
             <div class="text-xs text-slate-400">{{ user.last_activity ? formatDate(user.last_activity) : '—' }}</div>
             <div class="flex items-center gap-1">
-              <button @click="openEdit(user)" class="action-btn hover:text-amber-600 hover:bg-amber-50">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                </svg>
-              </button>
-              <button @click="openResetPassword(user)" class="action-btn hover:text-indigo-600 hover:bg-indigo-50">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
-                </svg>
-              </button>
-              <button v-if="user.is_active && user.role !== 'admin'" @click="confirmDeactivate(user)" class="action-btn hover:text-rose-600 hover:bg-rose-50">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
-                </svg>
-              </button>
-              <button v-else @click="handleActivate(user)" class="action-btn hover:text-emerald-600 hover:bg-emerald-50">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-              </button>
+              <template v-if="canManage(user)">
+                <button @click="openEdit(user)" class="action-btn hover:text-amber-600 hover:bg-amber-50">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                  </svg>
+                </button>
+                <button @click="openResetPassword(user)" class="action-btn hover:text-indigo-600 hover:bg-indigo-50">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+                  </svg>
+                </button>
+                <button v-if="user.is_active && user.role !== 'admin'" @click="confirmDeactivate(user)" class="action-btn hover:text-rose-600 hover:bg-rose-50">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                  </svg>
+                </button>
+                <button v-else @click="handleActivate(user)" class="action-btn hover:text-emerald-600 hover:bg-emerald-50">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                </button>
+              </template>
+              <span v-else class="text-xs text-slate-300">—</span>
             </div>
           </div>
         </div>
@@ -180,37 +183,40 @@
 
               <td class="td-col">
                 <div class="flex items-center justify-end gap-1">
-                  <button @click="openEdit(user)"
-                    class="action-btn hover:text-amber-600 hover:bg-amber-50"
-                    :title="t('common.edit')">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                    </svg>
-                  </button>
-                  <button @click="openResetPassword(user)"
-                    class="action-btn hover:text-indigo-600 hover:bg-indigo-50"
-                    :title="t('users.reset_title')">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
-                    </svg>
-                  </button>
-                  <button v-if="user.is_active && user.role !== 'admin'" @click="confirmDeactivate(user)"
-                    class="action-btn hover:text-rose-600 hover:bg-rose-50"
-                    :title="t('users.deactivate_btn')">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
-                    </svg>
-                  </button>
-                  <button v-else @click="handleActivate(user)"
-                    class="action-btn hover:text-emerald-600 hover:bg-emerald-50">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                  </button>
+                  <template v-if="canManage(user)">
+                    <button @click="openEdit(user)"
+                      class="action-btn hover:text-amber-600 hover:bg-amber-50"
+                      :title="t('common.edit')">
+                      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                      </svg>
+                    </button>
+                    <button @click="openResetPassword(user)"
+                      class="action-btn hover:text-indigo-600 hover:bg-indigo-50"
+                      :title="t('users.reset_title')">
+                      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+                      </svg>
+                    </button>
+                    <button v-if="user.is_active && user.role !== 'admin'" @click="confirmDeactivate(user)"
+                      class="action-btn hover:text-rose-600 hover:bg-rose-50"
+                      :title="t('users.deactivate_btn')">
+                      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                      </svg>
+                    </button>
+                    <button v-else @click="handleActivate(user)"
+                      class="action-btn hover:text-emerald-600 hover:bg-emerald-50">
+                      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                      </svg>
+                    </button>
+                  </template>
+                  <span v-else class="text-xs text-slate-300">—</span>
                 </div>
               </td>
             </tr>
@@ -479,6 +485,10 @@ async function handleSave() {
   } catch (e) {
     toast.error(e.response?.data?.message || t('toast.error'))
   } finally { saving.value = false }
+}
+
+function canManage(user) {
+  return !(user.role === 'admin' && user.id !== authStore.user?.id)
 }
 
 function openResetPassword(user) { resetTarget.value = user; newPassword.value = '' }

@@ -35,7 +35,7 @@
       <nav class="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
         <!-- Main -->
         <div v-if="sidebarShowContent" class="px-3 mb-1.5">
-          <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">{{ t('nav.main') }}</span>
+          <span class="text-[10px] font-semibold uppercase tracking-widest">{{ t('nav.main') }}</span>
         </div>
         <NavItem v-for="item in mainNavItems" :key="item.name"
           :item="item" :collapsed="sidebarCollapsed && !mobileMenuOpen" />
@@ -43,7 +43,7 @@
         <!-- Management -->
         <template v-if="auth.isAdmin || auth.isMaster">
           <div v-if="sidebarShowContent" class="px-3 mt-5 mb-1.5">
-            <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">{{ t('nav.management') }}</span>
+            <span class="text-[10px] font-semibold  uppercase tracking-widest">{{ t('nav.management') }}</span>
           </div>
           <div v-if="!sidebarShowContent" class="border-t border-slate-100 my-2 mx-1"></div>
           <NavItem v-for="item in managementNavItems" :key="item.name"
@@ -53,7 +53,7 @@
         <!-- Admin only -->
         <template v-if="auth.isAdmin">
           <div v-if="sidebarShowContent" class="px-3 mt-5 mb-1.5">
-            <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">{{ t('nav.administration') }}</span>
+            <span class="text-[10px] font-semibold  uppercase tracking-widest">{{ t('nav.administration') }}</span>
           </div>
           <div v-if="!sidebarShowContent" class="border-t border-slate-100 my-2 mx-1"></div>
           <NavItem v-for="item in adminNavItems" :key="item.name"
