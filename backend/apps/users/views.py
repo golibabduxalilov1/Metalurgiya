@@ -134,7 +134,13 @@ class UserViewSet(viewsets.ModelViewSet):
 
     @staticmethod
     def _ensure_can_modify(request, target_user):
-        """Администратор не может выполнять действия над другим администратором"""
+        # Superuser can do anything
+        if request.user.is_superuser:
+            return
+        # Non-superuser cannot touch a superuser
+        if target_user.is_superuser:
+            raise PermissionDenied('Нет прав для действий над суперадминистратором')
+        # Regular admin cannot touch another admin
         if target_user.role == 'admin' and target_user != request.user:
             raise PermissionDenied('Администратор не может выполнять действия над другим администратором')
 

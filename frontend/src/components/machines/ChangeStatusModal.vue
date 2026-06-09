@@ -39,13 +39,15 @@
             :placeholder="selectedStatus?.requires_comment
               ? t('modals.comment_ph_required')
               : t('modals.comment_ph')"
-          </textarea>
+          ></textarea>
         </div>
       </div>
 
       <div class="modal-footer">
         <button @click="$emit('close')" class="btn-md btn-secondary">{{ t('common.cancel') }}</button>
-        <button @click="handleSave" :disabled="saving || !selectedStatus" class="btn-md btn-primary">
+        <button @click="handleSave"
+          :disabled="saving || !selectedStatus || (selectedStatus?.requires_comment && !comment.trim())"
+          class="btn-md btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
           <svg v-if="saving" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>

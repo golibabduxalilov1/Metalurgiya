@@ -118,6 +118,7 @@ class MachineListSerializer(serializers.ModelSerializer):
     workshop_name = serializers.CharField(source='workshop.name', read_only=True)
     section_name = serializers.CharField(source='section.name', read_only=True)
     operator_name = serializers.SerializerMethodField()
+    book_value = serializers.SerializerMethodField()
 
     class Meta:
         model = Machine
@@ -127,11 +128,16 @@ class MachineListSerializer(serializers.ModelSerializer):
             'current_status', 'current_status_name', 'current_status_color',
             'workshop', 'workshop_name', 'section', 'section_name', 'workplace',
             'assigned_operator', 'operator_name', 'assigned_brigade',
+            'initial_cost', 'useful_life_years', 'residual_value', 'book_value',
             'deleted_at', 'created_at', 'updated_at'
         ]
 
     def get_operator_name(self, obj):
         return obj.assigned_operator.full_name if obj.assigned_operator else None
+
+    def get_book_value(self, obj):
+        info = obj.amortization_info
+        return info['book_value'] if info else None
 
 
 class MachineDetailSerializer(serializers.ModelSerializer):
@@ -145,6 +151,8 @@ class MachineDetailSerializer(serializers.ModelSerializer):
     recent_status_history = serializers.SerializerMethodField()
     current_assignment = serializers.SerializerMethodField()
 
+    amortization_info = serializers.SerializerMethodField()
+
     class Meta:
         model = Machine
         fields = [
@@ -154,6 +162,7 @@ class MachineDetailSerializer(serializers.ModelSerializer):
             'current_status', 'current_status_data',
             'workshop', 'workshop_name', 'section', 'section_name', 'workplace',
             'assigned_operator', 'operator_data', 'assigned_brigade',
+            'initial_cost', 'useful_life_years', 'residual_value', 'amortization_info',
             'description', 'attachments', 'recent_status_history', 'current_assignment',
             'deleted_at', 'created_at', 'updated_at', 'created_by', 'created_by_name'
         ]
@@ -180,6 +189,9 @@ class MachineDetailSerializer(serializers.ModelSerializer):
             return MachineAssignmentSerializer(assignment).data
         return None
 
+    def get_amortization_info(self, obj):
+        return obj.amortization_info
+
 
 class MachineCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
@@ -189,7 +201,8 @@ class MachineCreateUpdateSerializer(serializers.ModelSerializer):
             'year_manufactured', 'commissioned_date',
             'machine_type', 'current_status',
             'workshop', 'section', 'workplace',
-            'assigned_operator', 'assigned_brigade', 'description'
+            'assigned_operator', 'assigned_brigade', 'description',
+            'initial_cost', 'useful_life_years', 'residual_value',
         ]
 
     def validate_inventory_number(self, value):

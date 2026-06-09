@@ -442,7 +442,7 @@ const filters = reactive({
   search: '',
   status: route.query.status || '',
   workshop: route.query.workshop || '',
-  machine_type: '',
+  machine_type: route.query.machine_type || '',
   include_deleted: false,
   page: 1,
   page_size: 25,

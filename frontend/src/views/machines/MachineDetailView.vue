@@ -172,6 +172,80 @@
             </div>
           </div>
 
+          <!-- Cost & Amortization -->
+          <div v-if="machine.initial_cost" class="card p-6">
+            <div class="section-header mb-5 pb-4 border-b border-slate-100">
+              <div class="section-icon bg-violet-50">
+                <svg class="w-4 h-4 text-violet-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+              </div>
+              <h2 class="section-title">{{ t('machines.form_cost_section') }}</h2>
+            </div>
+
+            <!-- Cost fields -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-3 mb-5">
+              <div>
+                <div class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
+                  {{ t('machines.form_initial_cost') }}
+                </div>
+                <div class="text-sm font-semibold text-slate-800">
+                  {{ formatMoney(machine.initial_cost) }} {{ t('machines.amort_currency') }}
+                </div>
+              </div>
+              <div>
+                <div class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
+                  {{ t('machines.form_useful_life') }}
+                </div>
+                <div class="text-sm font-semibold text-slate-800">
+                  {{ machine.useful_life_years || '—' }}
+                </div>
+              </div>
+              <div v-if="machine.residual_value != null">
+                <div class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
+                  {{ t('machines.form_residual_value') }}
+                </div>
+                <div class="text-sm font-semibold text-slate-800">
+                  {{ formatMoney(machine.residual_value) }} {{ t('machines.amort_currency') }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Amortization calc -->
+            <div v-if="machine.amortization_info" class="pt-4 border-t border-slate-100">
+              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+                {{ t('machines.amort_preview') }}
+              </p>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div class="rounded-xl bg-violet-50 border border-violet-100 px-4 py-3">
+                  <p class="text-xs text-violet-500 mb-1">{{ t('machines.amort_annual') }}</p>
+                  <p class="text-sm font-semibold text-violet-800">
+                    {{ formatMoney(machine.amortization_info.annual_depreciation) }}
+                  </p>
+                </div>
+                <div class="rounded-xl bg-slate-50 border border-slate-100 px-4 py-3">
+                  <p class="text-xs text-slate-500 mb-1">{{ t('machines.amort_years_used') }}</p>
+                  <p class="text-sm font-semibold text-slate-700">
+                    {{ machine.amortization_info.years_used }}
+                  </p>
+                </div>
+                <div class="rounded-xl bg-orange-50 border border-orange-100 px-4 py-3">
+                  <p class="text-xs text-orange-500 mb-1">{{ t('machines.amort_accumulated') }}</p>
+                  <p class="text-sm font-semibold text-orange-800">
+                    {{ formatMoney(machine.amortization_info.accumulated_depreciation) }}
+                  </p>
+                </div>
+                <div class="rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3">
+                  <p class="text-xs text-emerald-500 mb-1">{{ t('machines.amort_book_value') }}</p>
+                  <p class="text-sm font-semibold text-emerald-800">
+                    {{ formatMoney(machine.amortization_info.book_value) }}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Attachments -->
           <div class="card p-6">
             <div class="flex items-center justify-between mb-5 pb-4 border-b border-slate-100">
@@ -367,6 +441,10 @@ const colorMap = { green: 'working', yellow: 'idle', red: 'repair', gray: 'retir
 
 function formatDate(d) { return d ? dayjs(d).format('DD.MM.YYYY') : '—' }
 function formatDateTime(d) { return d ? dayjs(d).format('DD.MM.YYYY HH:mm') : '—' }
+function formatMoney(val) {
+  if (val == null) return '—'
+  return Number(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
 
 function fileIconClass(type) {
   if (!type) return 'bg-slate-200 text-slate-500'

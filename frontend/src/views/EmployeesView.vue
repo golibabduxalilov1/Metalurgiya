@@ -94,6 +94,11 @@
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                 </svg>
               </button>
+              <button v-if="auth.isAdmin" @click="confirmDelete(emp)" class="action-btn hover:text-rose-600 hover:bg-rose-50">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16"/>
+                </svg>
+              </button>
             </div>
           </div>
           <div class="mt-1.5 ml-11 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-slate-500">
@@ -163,6 +168,14 @@
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                    </svg>
+                  </button>
+                  <button @click="confirmDelete(emp)"
+                    class="action-btn hover:text-rose-600 hover:bg-rose-50"
+                    :title="t('common.delete')">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16"/>
                     </svg>
                   </button>
                 </div>
@@ -275,10 +288,10 @@
           <div class="flex items-center justify-end gap-3 px-6 py-4
                       border-t border-slate-100 bg-slate-50/60">
             <button @click="showModal = false" class="btn-md btn-secondary">{{ t('common.cancel') }}</button>
-            <button @click="handleSave" :disabled="saving"
+            <button @click="handleSave" :disabled="saving || !canSave"
               class="btn-md btn-primary min-w-[120px] shadow-md shadow-indigo-500/20
                      hover:-translate-y-px transition-all duration-200
-                     disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0">
+                     disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0">
               <svg v-if="saving" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
@@ -293,16 +306,26 @@
       </div>
     </Transition>
 
+    <!-- Delete confirm modal -->
+    <ConfirmModal v-if="deleteTarget"
+      :title="t('employees.delete_title')"
+      :message="`${deleteTarget.full_name || deleteTarget.first_name} ${t('employees.delete_msg_suffix')}`"
+      :confirm-label="t('employees.delete_confirm')"
+      confirm-class="btn-danger"
+      @confirm="doDelete"
+      @cancel="deleteTarget = null" />
+
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useToast } from 'vue-toastification'
 import { useAuthStore } from '@/store/auth'
 import { useI18n } from '@/i18n'
 import { employeesApi, workshopsApi } from '@/api'
 import { useDebounceFn } from '@vueuse/core'
+import ConfirmModal from '@/components/common/ConfirmModal.vue'
 
 const auth = useAuthStore()
 const toast = useToast()
@@ -314,8 +337,11 @@ const search = ref('')
 const workshopFilter = ref('')
 const showModal = ref(false)
 const editEmp = ref(null)
+const deleteTarget = ref(null)
 const saving = ref(false)
 const form = reactive({ last_name: '', first_name: '', patronymic: '', position: '', workshop: '', phone: '', email: '', notes: '', is_active: true })
+
+const canSave = computed(() => form.last_name.trim() !== '' && form.first_name.trim() !== '')
 
 const debouncedLoad = useDebounceFn(loadEmployees, 400)
 
@@ -341,6 +367,19 @@ function openEdit(emp) {
   Object.assign(form, emp)
   showModal.value = true
 }
+function confirmDelete(emp) { deleteTarget.value = emp }
+
+async function doDelete() {
+  try {
+    await employeesApi.delete(deleteTarget.value.id)
+    toast.success(t('toast.delete_success'))
+    deleteTarget.value = null
+    loadEmployees()
+  } catch {
+    toast.error(t('toast.delete_error'))
+  }
+}
+
 async function handleSave() {
   saving.value = true
   try {

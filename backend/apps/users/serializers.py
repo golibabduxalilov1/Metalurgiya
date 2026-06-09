@@ -34,7 +34,7 @@ class UserListSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'full_name', 'role', 'role_display',
-                  'phone', 'is_active', 'created_at', 'last_activity']
+                  'phone', 'is_active', 'is_superuser', 'created_at', 'last_activity']
 
     def get_full_name(self, obj):
         return obj.get_full_name()
@@ -47,7 +47,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'first_name', 'last_name', 'patronymic',
-                  'full_name', 'role', 'role_display', 'phone', 'is_active',
+                  'full_name', 'role', 'role_display', 'phone', 'is_active', 'is_superuser',
                   'created_at', 'updated_at', 'last_activity']
 
     def get_full_name(self, obj):
@@ -109,7 +109,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'first_name', 'last_name', 'patronymic',
-                  'full_name', 'role', 'role_display', 'phone', 'last_activity']
+                  'full_name', 'role', 'role_display', 'phone', 'is_superuser', 'last_activity']
 
     def get_full_name(self, obj):
         return obj.get_full_name()

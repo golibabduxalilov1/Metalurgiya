@@ -211,6 +211,79 @@
         </div>
       </div>
 
+      <!-- Cost & Amortization -->
+      <div class="card p-6">
+        <div class="section-header mb-5 pb-4 border-b border-slate-100">
+          <div class="section-icon bg-violet-50">
+            <svg class="w-4 h-4 text-violet-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+          </div>
+          <h2 class="section-title">{{ t('machines.form_cost_section') }}</h2>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5 items-end">
+          <div>
+            <label class="form-label">{{ t('machines.form_initial_cost') }}</label>
+            <div class="relative">
+              <input v-model="form.initial_cost" type="number" min="0" step="0.01"
+                class="form-input pr-12"
+                :placeholder="t('machines.form_initial_cost_ph')" />
+              <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
+                {{ t('machines.amort_currency') }}
+              </span>
+            </div>
+          </div>
+
+          <div>
+            <label class="form-label">{{ t('machines.form_useful_life') }}</label>
+            <input v-model="form.useful_life_years" type="number" min="1" max="100"
+              class="form-input"
+              :placeholder="t('machines.form_useful_life_ph')" />
+          </div>
+
+          <div>
+            <label class="form-label">{{ t('machines.form_residual_value') }}</label>
+            <p class="text-xs text-slate-400 mb-1.5">{{ t('machines.form_residual_hint') }}</p>
+            <div class="relative">
+              <input v-model="form.residual_value" type="number" min="0" step="0.01"
+                class="form-input pr-12"
+                :placeholder="t('machines.form_residual_value_ph')" />
+              <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
+                {{ t('machines.amort_currency') }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Amortization preview -->
+        <div class="mt-5 pt-5 border-t border-slate-100">
+          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+            {{ t('machines.amort_preview') }}
+          </p>
+          <div v-if="amortCalc" class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="rounded-xl bg-violet-50 border border-violet-100 px-4 py-3">
+              <p class="text-xs text-violet-500 mb-1">{{ t('machines.amort_annual') }}</p>
+              <p class="text-sm font-semibold text-violet-800">{{ formatMoney(amortCalc.annual) }}</p>
+            </div>
+            <div class="rounded-xl bg-slate-50 border border-slate-100 px-4 py-3">
+              <p class="text-xs text-slate-500 mb-1">{{ t('machines.amort_years_used') }}</p>
+              <p class="text-sm font-semibold text-slate-700">{{ amortCalc.yearsUsed }}</p>
+            </div>
+            <div class="rounded-xl bg-orange-50 border border-orange-100 px-4 py-3">
+              <p class="text-xs text-orange-500 mb-1">{{ t('machines.amort_accumulated') }}</p>
+              <p class="text-sm font-semibold text-orange-800">{{ formatMoney(amortCalc.accumulated) }}</p>
+            </div>
+            <div class="rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3">
+              <p class="text-xs text-emerald-500 mb-1">{{ t('machines.amort_book_value') }}</p>
+              <p class="text-sm font-semibold text-emerald-800">{{ formatMoney(amortCalc.bookValue) }}</p>
+            </div>
+          </div>
+          <p v-else class="text-xs text-slate-400 italic">{{ t('machines.amort_no_data') }}</p>
+        </div>
+      </div>
+
       <!-- Actions -->
       <div class="flex items-center justify-between pt-1 pb-2">
         <button type="button" @click="$router.back()"
@@ -221,10 +294,10 @@
           </svg>
           {{ t('common.cancel') }}
         </button>
-        <button type="submit" :disabled="saving"
+        <button type="submit" :disabled="saving || !canSave"
           class="btn-md btn-primary min-w-[140px] sm:min-w-[180px] shadow-lg shadow-indigo-500/25
                  hover:shadow-indigo-500/40 hover:-translate-y-px
-                 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0
+                 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0
                  transition-all duration-200">
           <svg v-if="saving" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
@@ -264,6 +337,7 @@ const form = reactive({
   machine_type: '', current_status: '',
   workshop: '', section: '', workplace: '',
   assigned_operator: '', assigned_brigade: '',
+  initial_cost: '', useful_life_years: '', residual_value: '',
 })
 
 const types = ref([])
@@ -275,6 +349,39 @@ const employees = ref([])
 const filteredSections = computed(() =>
   sections.value.filter(s => s.workshop === form.workshop || s.workshop === Number(form.workshop))
 )
+
+const canSave = computed(() => form.name.trim() !== '' && form.inventory_number.trim() !== '')
+
+const amortCalc = computed(() => {
+  const cost = parseFloat(form.initial_cost)
+  const years = parseInt(form.useful_life_years)
+  if (!cost || !years || cost <= 0 || years <= 0) return null
+
+  const residual = parseFloat(form.residual_value) || 0
+  const annual = (cost - residual) / years
+
+  let yearsUsed = 0
+  if (form.commissioned_date) {
+    const start = new Date(form.commissioned_date)
+    const now = new Date()
+    const days = (now - start) / (1000 * 60 * 60 * 24)
+    yearsUsed = Math.min(days / 365.25, years)
+  }
+
+  const accumulated = annual * yearsUsed
+  const bookValue = Math.max(cost - accumulated, residual)
+
+  return {
+    annual: annual.toFixed(2),
+    yearsUsed: yearsUsed.toFixed(2),
+    accumulated: accumulated.toFixed(2),
+    bookValue: bookValue.toFixed(2),
+  }
+})
+
+function formatMoney(val) {
+  return Number(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
 
 function onWorkshopChange() { form.section = '' }
 
@@ -318,6 +425,9 @@ async function loadMachine() {
       workplace: m.workplace || '',
       assigned_operator: m.assigned_operator || '',
       assigned_brigade: m.assigned_brigade || '',
+      initial_cost: m.initial_cost || '',
+      useful_life_years: m.useful_life_years || '',
+      residual_value: m.residual_value || '',
     })
   } catch {
     toast.error(t('toast.load_data_error'))
@@ -330,9 +440,13 @@ async function handleSubmit() {
   saving.value = true
 
   const payload = { ...form }
-  // Clean empty values
-  Object.keys(payload).forEach(k => {
-    if (payload[k] === '' || payload[k] === null) payload[k] = null
+  // Convert empty strings to null only for fields that accept null on the backend
+  // (model, manufacturer, workplace, assigned_brigade, description must stay as empty strings)
+  const nullableFields = ['year_manufactured', 'commissioned_date', 'machine_type',
+    'current_status', 'workshop', 'section', 'assigned_operator',
+    'initial_cost', 'useful_life_years', 'residual_value']
+  nullableFields.forEach(k => {
+    if (payload[k] === '') payload[k] = null
   })
 
   try {

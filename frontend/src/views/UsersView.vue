@@ -112,7 +112,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
                   </svg>
                 </button>
-                <button v-if="user.is_active && user.role !== 'admin'" @click="confirmDeactivate(user)" class="action-btn hover:text-rose-600 hover:bg-rose-50">
+                <button v-if="user.is_active && canDeactivate(user)" @click="confirmDeactivate(user)" class="action-btn hover:text-rose-600 hover:bg-rose-50">
                   <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
                   </svg>
@@ -200,7 +200,7 @@
                           d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
                       </svg>
                     </button>
-                    <button v-if="user.is_active && user.role !== 'admin'" @click="confirmDeactivate(user)"
+                    <button v-if="user.is_active && canDeactivate(user)" @click="confirmDeactivate(user)"
                       class="action-btn hover:text-rose-600 hover:bg-rose-50"
                       :title="t('users.deactivate_btn')">
                       <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -488,7 +488,25 @@ async function handleSave() {
 }
 
 function canManage(user) {
-  return !(user.role === 'admin' && user.id !== authStore.user?.id)
+  const me = authStore.user
+  // Superadmin can manage anyone
+  if (me?.is_superuser) return true
+  // Nobody (except superadmin) can touch a superadmin account
+  if (user.is_superuser) return false
+  // Regular admin cannot manage another admin
+  if (user.role === 'admin' && user.id !== me?.id) return false
+  return true
+}
+
+function canDeactivate(user) {
+  const me = authStore.user
+  // Cannot deactivate yourself
+  if (user.id === me?.id) return false
+  // Superadmin can deactivate any admin
+  if (me?.is_superuser) return true
+  // Regular admin cannot deactivate another admin
+  if (user.role === 'admin') return false
+  return true
 }
 
 function openResetPassword(user) { resetTarget.value = user; newPassword.value = '' }

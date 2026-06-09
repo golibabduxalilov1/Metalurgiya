@@ -92,6 +92,18 @@ class Machine(models.Model):
     )
     assigned_brigade = models.CharField('Бригада', max_length=200, blank=True)
 
+    # Стоимость и амортизация
+    initial_cost = models.DecimalField(
+        'Начальная стоимость', max_digits=15, decimal_places=2, null=True, blank=True
+    )
+    useful_life_years = models.PositiveIntegerField(
+        'Срок полезного использования (лет)', null=True, blank=True
+    )
+    residual_value = models.DecimalField(
+        'Ликвидационная стоимость', max_digits=15, decimal_places=2,
+        null=True, blank=True, default=None
+    )
+
     # Дополнительно
     description = models.TextField('Описание / Комментарий', blank=True)
 
@@ -128,6 +140,36 @@ class Machine(models.Model):
     @property
     def is_deleted(self):
         return self.deleted_at is not None
+
+    @property
+    def amortization_info(self):
+        if not self.initial_cost or not self.useful_life_years:
+            return None
+        from decimal import Decimal
+        import datetime
+        from django.utils import timezone
+
+        initial = self.initial_cost
+        residual = self.residual_value if self.residual_value is not None else Decimal('0')
+        years = self.useful_life_years
+        annual = (initial - residual) / years
+
+        if self.commissioned_date:
+            today = timezone.now().date()
+            days_used = (today - self.commissioned_date).days
+            years_used = min(days_used / 365.25, years)
+        else:
+            years_used = 0
+
+        accumulated = annual * Decimal(str(round(years_used, 6)))
+        book_value = max(initial - accumulated, residual)
+
+        return {
+            'annual_depreciation': round(annual, 2),
+            'years_used': round(years_used, 2),
+            'accumulated_depreciation': round(accumulated, 2),
+            'book_value': round(book_value, 2),
+        }
 
 
 class MachineStatusHistory(models.Model):

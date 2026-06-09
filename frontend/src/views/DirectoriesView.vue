@@ -99,6 +99,13 @@
                   d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
               </svg>
             </button>
+            <button @click="openDelete('status', s)"
+              class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16"/>
+              </svg>
+            </button>
           </div>
         </div>
       </div>
@@ -173,7 +180,7 @@
           </div>
           <div class="modal-footer">
             <button @click="showModal = false" class="btn-md btn-secondary">{{ t('common.cancel') }}</button>
-            <button @click="handleSave" :disabled="saving" class="btn-md btn-primary inline-flex items-center gap-2">
+            <button @click="handleSave" :disabled="saving || !canSave" class="btn-md btn-primary inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
               <svg v-if="saving" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
@@ -184,6 +191,15 @@
         </div>
       </div>
     </Transition>
+
+    <!-- Delete confirm modal -->
+    <ConfirmModal v-if="deleteTarget"
+      :title="t('directories.delete_title')"
+      :message="`«${deleteTarget.item.name}» ${t('directories.delete_msg_suffix')}`"
+      :confirm-label="t('directories.delete_confirm')"
+      confirm-class="btn-danger"
+      @confirm="doDelete"
+      @cancel="deleteTarget = null" />
   </div>
 </template>
 
@@ -192,6 +208,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useToast } from 'vue-toastification'
 import { workshopsApi, machineTypesApi, statusesApi } from '@/api'
 import DirectoryPanel from '@/components/common/DirectoryPanel.vue'
+import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import { useI18n } from '@/i18n'
 
 const toast = useToast()
@@ -215,22 +232,61 @@ const showModal = ref(false)
 const saving = ref(false)
 const editTarget = ref(null)
 const modalType = ref('')
+const deleteTarget = ref(null)
 const form = reactive({ name: '', description: '', workshop: '', color: 'gray', requires_comment: false })
+
+const canSave = computed(() => {
+  if (!form.name.trim()) return false
+  if (modalType.value === 'section' && !form.workshop) return false
+  return true
+})
 
 const colorStyles = { green: '#10B981', yellow: '#F59E0B', red: '#EF4444', gray: '#6B7280', blue: '#3B82F6' }
 function getColorStyle(c) { return `background-color: ${colorStyles[c]}` }
 
 function openAdd(type) { modalType.value = type; editTarget.value = null; Object.assign(form, { name: '', description: '', workshop: '', color: 'gray', requires_comment: false }); showModal.value = true }
 function openEdit(type, item) { modalType.value = type; editTarget.value = item; Object.assign(form, item); showModal.value = true }
-function openDelete() { /* TODO */ }
+function openDelete(type, item) { deleteTarget.value = { type, item } }
+
+async function doDelete() {
+  try {
+    const { type, item } = deleteTarget.value
+    if (type === 'workshop') await workshopsApi.delete(item.id)
+    else if (type === 'section') await workshopsApi.deleteSection(item.id)
+    else if (type === 'type') await machineTypesApi.delete(item.id)
+    else if (type === 'status') await statusesApi.delete(item.id)
+    toast.success(t('toast.delete_success'))
+    deleteTarget.value = null
+    loadAll()
+  } catch (e) {
+    toast.error(e.response?.data?.message || t('toast.delete_error'))
+  }
+}
 
 async function handleSave() {
   saving.value = true
   try {
-    const apiMap = { workshop: workshopsApi, section: { create: d => workshopsApi.createSection(d), update: (id, d) => workshopsApi.updateSection(id, d) }, type: machineTypesApi, status: statusesApi }
+    const payloadMap = {
+      workshop: { name: form.name, description: form.description },
+      section:  { name: form.name, description: form.description, workshop: form.workshop },
+      type:     { name: form.name, description: form.description },
+      status:   { name: form.name, color: form.color, requires_comment: form.requires_comment },
+    }
+    const apiMap = {
+      workshop: workshopsApi,
+      section:  { create: d => workshopsApi.createSection(d), update: (id, d) => workshopsApi.updateSection(id, d) },
+      type:     machineTypesApi,
+      status:   statusesApi,
+    }
     const api = apiMap[modalType.value]
-    if (editTarget.value) { await api.update(editTarget.value.id, form); toast.success(t('toast.update_success')) }
-    else { await api.create ? api.create(form) : null; toast.success(t('toast.create_success')) }
+    const payload = payloadMap[modalType.value]
+    if (editTarget.value) {
+      await api.update(editTarget.value.id, payload)
+      toast.success(t('toast.update_success'))
+    } else {
+      await api.create(payload)
+      toast.success(t('toast.create_success'))
+    }
     showModal.value = false
     loadAll()
   } catch (e) { toast.error(e.response?.data?.message || t('toast.error')) }

@@ -14,6 +14,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isAdmin = computed(() => user.value?.role === 'admin')
   const isMaster = computed(() => user.value?.role === 'master')
   const isOperator = computed(() => user.value?.role === 'operator')
+  const isSuperuser = computed(() => !!user.value?.is_superuser)
   const canWrite = computed(() => ['admin', 'master'].includes(user.value?.role))
   const userFullName = computed(() => user.value?.first_name || user.value?.username || '')
   const userRole = computed(() => user.value?.role_display || '')
@@ -80,7 +81,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   return {
     user, accessToken, refreshToken, loading, initialized,
-    isAuthenticated, isAdmin, isMaster, isOperator, canWrite,
+    isAuthenticated, isAdmin, isMaster, isOperator, isSuperuser, canWrite,
     userFullName, userRole,
     login, logout, fetchMe, hasRole
   }

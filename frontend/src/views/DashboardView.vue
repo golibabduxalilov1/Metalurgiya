@@ -1,228 +1,250 @@
 <template>
-  <div class="animate-fade-in space-y-6">
+  <div class="animate-fade-in space-y-5">
 
-    <!-- Page header -->
-    <div class="page-header">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
       <div>
-        <h1 class="page-title">{{ t('dashboard.title') }}</h1>
-        <p class="page-subtitle">{{ t('dashboard.subtitle') }}</p>
+        <h1 class="text-xl font-bold text-slate-900">{{ t('dashboard.title') }}</h1>
+        <p class="text-xs text-slate-400 mt-0.5">{{ currentDate }}</p>
       </div>
-      <div class="inline-flex items-center gap-2 bg-white border border-slate-200
-                  text-slate-600 text-xs font-medium px-3 py-2 rounded-xl shadow-sm flex-shrink-0">
-        <svg class="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-        </svg>
-        {{ currentDate }}
-      </div>
-    </div>
-
-    <!-- Loading skeletons -->
-    <div v-if="loading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-      <div v-for="i in 4" :key="i" class="skeleton h-24 sm:h-28 rounded-xl"></div>
-    </div>
-
-    <!-- KPI cards -->
-    <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-
-      <div class="kpi-card kpi-indigo cursor-pointer" @click="$router.push('/machines')">
-        <div class="kpi-icon bg-indigo-50">
-          <svg class="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/>
-          </svg>
-        </div>
-        <div>
-          <div class="kpi-value">{{ stats.total }}</div>
-          <div class="kpi-label">{{ t('dashboard.total') }}</div>
-        </div>
-      </div>
-
-      <div class="kpi-card kpi-emerald cursor-pointer" @click="goToStatus('working')">
-        <div class="kpi-icon bg-emerald-50">
-          <svg class="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
-        </div>
-        <div>
-          <div class="kpi-value text-emerald-600">{{ stats.working }}</div>
-          <div class="kpi-label">{{ t('dashboard.working') }}</div>
-        </div>
-      </div>
-
-      <div class="kpi-card kpi-rose cursor-pointer" @click="goToStatus('repair')">
-        <div class="kpi-icon bg-rose-50">
-          <svg class="w-5 h-5 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-          </svg>
-        </div>
-        <div>
-          <div class="kpi-value text-rose-500">{{ stats.repair }}</div>
-          <div class="kpi-label">{{ t('dashboard.repair') }}</div>
-        </div>
-      </div>
-
-      <div class="kpi-card kpi-amber cursor-pointer" @click="goToStatus('idle')">
-        <div class="kpi-icon bg-amber-50">
-          <svg class="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
-        </div>
-        <div>
-          <div class="kpi-value text-amber-500">{{ stats.idle }}</div>
-          <div class="kpi-label">{{ t('dashboard.idle') }}</div>
-        </div>
+      <div :class="['health-badge', `health-${fleetHealth.level}`]">
+        <span class="w-1.5 h-1.5 rounded-full flex-shrink-0" :class="{
+          'bg-emerald-500': fleetHealth.level === 'good',
+          'bg-amber-500':   fleetHealth.level === 'warning',
+          'bg-rose-500':    fleetHealth.level === 'critical',
+        }"></span>
+        {{ fleetHealth.label }}
       </div>
     </div>
 
-    <!-- Status distribution + recent activity -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- KPI skeleton -->
+    <div v-if="loading" class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div v-for="i in 4" :key="i" class="skeleton h-36 rounded-2xl"></div>
+    </div>
 
-      <!-- Status distribution -->
-      <div class="card p-6">
-        <div class="section-header mb-5 pb-4 border-b border-slate-100">
-          <div class="section-icon bg-indigo-50">
-            <svg class="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <!-- KPI Cards -->
+    <div v-else class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+
+      <div class="kpi-card kpi-indigo" @click="$router.push('/machines')">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <div class="kpi-value">{{ stats.total }}</div>
+            <div class="kpi-label">{{ t('dashboard.total') }}</div>
+          </div>
+          <div class="kpi-icon bg-indigo-50">
+            <svg class="w-6 h-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/>
+                d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
             </svg>
           </div>
-          <h3 class="section-title">{{ t('dashboard.statuses') }}</h3>
         </div>
-        <div v-if="loading" class="space-y-3">
-          <div v-for="i in 4" :key="i" class="skeleton h-10 rounded-lg"></div>
+        <div class="flex justify-between items-center mb-1.5">
+          <span class="text-xs text-slate-400">{{ t('dashboard.efficiency') }}</span>
+          <span class="text-xs font-bold text-indigo-600">{{ efficiency }}%</span>
         </div>
-        <div v-else class="space-y-2">
-          <div v-for="item in statusDistribution" :key="item.name"
-            class="flex items-center gap-3 cursor-pointer px-2 py-2 rounded-lg -mx-2
-                   hover:bg-slate-50 transition-colors duration-150 group"
-            @click="goToStatus(item.colorKey)">
-            <div class="w-2.5 h-2.5 rounded-full flex-shrink-0"
-              :class="`status-dot-${item.color}`"></div>
-            <span class="text-sm text-slate-600 flex-1 group-hover:text-slate-800
-                         transition-colors duration-150 truncate">{{ item.name }}</span>
-            <span class="text-sm font-bold text-slate-900 tabular-nums w-6 text-right">
-              {{ item.count }}
-            </span>
-            <div class="w-20 bg-slate-100 rounded-full h-2 flex-shrink-0 overflow-hidden">
-              <div class="h-2 rounded-full transition-all duration-500"
-                :class="barColorClass(item.color)"
-                :style="{ width: `${stats.total ? (item.count / stats.total) * 100 : 0}%` }">
+        <div class="progress-track"><div class="progress-fill bg-indigo-500" :style="{ width: efficiency + '%' }"></div></div>
+      </div>
+
+      <div class="kpi-card kpi-emerald" @click="goToStatus('working')">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <div class="kpi-value text-emerald-600">{{ stats.working }}</div>
+            <div class="kpi-label">{{ t('dashboard.working') }}</div>
+          </div>
+          <div class="kpi-icon bg-emerald-50">
+            <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+          </div>
+        </div>
+        <div class="flex justify-between items-center mb-1.5">
+          <span class="text-xs text-slate-400">{{ t('dashboard.of_fleet') }}</span>
+          <span class="text-xs font-bold text-emerald-600">{{ pct(stats.working) }}%</span>
+        </div>
+        <div class="progress-track"><div class="progress-fill bg-emerald-500" :style="{ width: pct(stats.working) + '%' }"></div></div>
+      </div>
+
+      <div class="kpi-card kpi-rose" @click="goToStatus('repair')">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <div class="kpi-value text-rose-500">{{ stats.repair }}</div>
+            <div class="kpi-label">{{ t('dashboard.repair') }}</div>
+          </div>
+          <div class="kpi-icon bg-rose-50">
+            <svg class="w-6 h-6 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+          </div>
+        </div>
+        <div class="flex justify-between items-center mb-1.5">
+          <span class="text-xs text-slate-400">{{ t('dashboard.of_fleet') }}</span>
+          <span class="text-xs font-bold text-rose-500">{{ pct(stats.repair) }}%</span>
+        </div>
+        <div class="progress-track"><div class="progress-fill bg-rose-500" :style="{ width: pct(stats.repair) + '%' }"></div></div>
+      </div>
+
+      <div class="kpi-card kpi-amber" @click="goToStatus('idle')">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <div class="kpi-value text-amber-500">{{ stats.idle }}</div>
+            <div class="kpi-label">{{ t('dashboard.idle') }}</div>
+          </div>
+          <div class="kpi-icon bg-amber-50">
+            <svg class="w-6 h-6 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+          </div>
+        </div>
+        <div class="flex justify-between items-center mb-1.5">
+          <span class="text-xs text-slate-400">{{ t('dashboard.of_fleet') }}</span>
+          <span class="text-xs font-bold text-amber-500">{{ pct(stats.idle) }}%</span>
+        </div>
+        <div class="progress-track"><div class="progress-fill bg-amber-500" :style="{ width: pct(stats.idle) + '%' }"></div></div>
+      </div>
+    </div>
+
+    <!-- Row 2: Donut + Line -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+      <!-- Status Doughnut -->
+      <div class="card p-5">
+        <div class="chart-header">
+          <h3 class="chart-title">{{ t('dashboard.statuses') }}</h3>
+        </div>
+        <div v-if="loading" class="skeleton h-64 rounded-xl mt-4"></div>
+        <template v-else-if="statusDistribution.length > 0">
+          <div class="relative mt-3" style="height:210px">
+            <Doughnut :data="doughnutData" :options="doughnutOptions" />
+            <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <div class="text-3xl font-bold text-slate-900 tabular-nums">{{ efficiency }}%</div>
+              <div class="text-xs text-slate-400 text-center leading-tight mt-1">{{ t('dashboard.efficiency') }}</div>
+            </div>
+          </div>
+          <!-- Legend with mini bars -->
+          <div class="mt-4 space-y-2.5">
+            <div v-for="item in statusDistribution" :key="item.name" class="group">
+              <div class="flex items-center justify-between mb-1">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="w-2.5 h-2.5 rounded flex-shrink-0"
+                    :style="{ backgroundColor: colorHex[item.color] || colorHex.gray }"></span>
+                  <span class="text-sm text-slate-600 truncate">{{ item.name }}</span>
+                </div>
+                <div class="text-sm flex-shrink-0 ml-2">
+                  <span class="font-bold text-slate-800">{{ item.count }}</span>
+                  <span class="text-slate-400 text-xs font-normal"> / {{ pct(item.count) }}%</span>
+                </div>
+              </div>
+              <div class="w-full bg-slate-100 rounded-full h-1.5">
+                <div class="h-1.5 rounded-full transition-all duration-700"
+                  :style="{ width: pct(item.count) + '%', backgroundColor: colorHex[item.color] || colorHex.gray }">
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </template>
+        <div v-else class="no-data mt-4">{{ t('common.no_data') }}</div>
       </div>
 
-      <!-- Recent status changes -->
-      <div class="card p-6 lg:col-span-2">
-        <div class="flex items-center justify-between mb-5 pb-4 border-b border-slate-100">
-          <div class="section-header">
-            <div class="section-icon bg-emerald-50">
-              <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M13 10V3L4 14h7v7l9-11h-7z"/>
-              </svg>
-            </div>
-            <h3 class="section-title">{{ t('dashboard.recent_changes') }}</h3>
+      <!-- Activity Line Chart -->
+      <div class="card p-5 lg:col-span-2">
+        <div class="chart-header mb-3">
+          <div>
+            <h3 class="chart-title">{{ t('dashboard.activity_trend') }}</h3>
+            <p class="text-[11px] text-slate-400 mt-0.5">{{ t('dashboard.activity_trend_hint') }}</p>
           </div>
-          <RouterLink to="/machines"
-            class="inline-flex items-center gap-1 text-xs font-medium text-indigo-600
-                   hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100
-                   border border-indigo-100 px-2.5 py-1 rounded-full
-                   transition-colors duration-150">
-            {{ t('dashboard.all') }}
+        </div>
+
+        <!-- Stats summary row -->
+        <div v-if="!loadingHistory" class="grid grid-cols-3 gap-3 mb-4">
+          <div class="stat-mini bg-indigo-50 rounded-xl p-3">
+            <div class="text-xl font-bold text-indigo-700 tabular-nums">{{ activityStats.total }}</div>
+            <div class="text-[10px] text-indigo-400 mt-0.5 uppercase tracking-wide font-medium">Jami</div>
+          </div>
+          <div class="stat-mini bg-slate-50 rounded-xl p-3">
+            <div class="text-xl font-bold text-slate-700 tabular-nums">{{ activityStats.max }}</div>
+            <div class="text-[10px] text-slate-400 mt-0.5 uppercase tracking-wide font-medium">Maks · {{ activityStats.maxDay }}</div>
+          </div>
+          <div class="stat-mini bg-slate-50 rounded-xl p-3">
+            <div class="text-xl font-bold text-slate-700 tabular-nums">{{ activityStats.avg }}</div>
+            <div class="text-[10px] text-slate-400 mt-0.5 uppercase tracking-wide font-medium">O'rtacha / kun</div>
+          </div>
+        </div>
+
+        <div v-if="loadingHistory" class="skeleton rounded-xl" style="height:220px"></div>
+        <div v-else style="height:220px">
+          <Line :data="activityTrendData" :options="activityTrendOptions" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 3: Workshops bar + Machine Types leaderboard -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+      <!-- Workshops multi-color horizontal bar -->
+      <div class="card p-5" v-if="auth.isAdmin || auth.isMaster">
+        <div class="chart-header mb-3">
+          <h3 class="chart-title">{{ t('dashboard.workshops') }}</h3>
+          <RouterLink to="/directories" class="chart-link">
+            {{ t('dashboard.directories_link') }}
             <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
             </svg>
           </RouterLink>
         </div>
-        <div v-if="loadingHistory" class="space-y-2.5">
-          <div v-for="i in 5" :key="i" class="skeleton h-14 rounded-lg"
-            :style="{ animationDelay: `${(i - 1) * 50}ms` }"></div>
+        <div v-if="loading" class="skeleton rounded-xl" style="height:260px"></div>
+        <div v-else-if="workshopStats.length === 0" class="no-data">{{ t('common.no_data') }}</div>
+        <div v-else class="chart-box" :style="{ height: chartHeight(workshopStats.length) }">
+          <Bar :data="workshopChartData" :options="workshopChartOptions" />
         </div>
-        <div v-else-if="recentChanges.length === 0"
-          class="flex flex-col items-center justify-center py-10 text-center">
-          <svg class="w-10 h-10 text-slate-200 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-          </svg>
-          <div class="text-sm text-slate-400">{{ t('common.no_data') }}</div>
+      </div>
+
+      <!-- Machine Types leaderboard -->
+      <div class="card p-5">
+        <div class="chart-header mb-3">
+          <h3 class="chart-title">{{ t('dashboard.machine_types') }}</h3>
+          <span class="text-[11px] text-slate-400">{{ typeStats.length }} {{ t('dashboard.type_count') }}</span>
         </div>
-        <div v-else class="divide-y divide-slate-100/80">
-          <div v-for="change in recentChanges" :key="change.id"
-            class="py-3 flex items-center gap-3 hover:bg-slate-50/70 -mx-2 px-2
-                   rounded-lg transition-colors duration-100 cursor-pointer group"
-            @click="$router.push(`/machines/${change.machine}`)">
-            <div class="flex-shrink-0">
-              <span :class="['status-badge', `status-${change.new_status_color}`]">
-                <span :class="['status-dot', `status-dot-${change.new_status_color}`]"></span>
-                {{ change.new_status_name }}
-              </span>
+        <div v-if="loading" class="skeleton rounded-xl" style="height:260px"></div>
+        <div v-else-if="typeStats.length === 0" class="no-data">{{ t('common.no_data') }}</div>
+        <div v-else class="space-y-3 mt-1">
+          <div
+            v-for="(tp, i) in typeStats" :key="tp.id"
+            class="leaderboard-row"
+            @click="router.push(`/machines?machine_type=${tp.id}`)"
+          >
+            <div
+              class="rank-badge"
+              :style="{ backgroundColor: typeBarColors[i % typeBarColors.length] + '20',
+                        color: typeBarColors[i % typeBarColors.length] }"
+            >
+              {{ i + 1 }}
             </div>
             <div class="flex-1 min-w-0">
-              <div class="text-sm font-semibold text-slate-800 truncate
-                          group-hover:text-indigo-600 transition-colors duration-150">
-                {{ t('dashboard.machine_prefix') }}{{ change.machine }}
+              <div class="flex items-center justify-between mb-1.5">
+                <span class="text-sm font-medium text-slate-700 truncate pr-2">{{ tp.name }}</span>
+                <span class="text-sm font-bold text-slate-800 flex-shrink-0">
+                  {{ tp.machines_count }}
+                  <span class="text-xs font-normal text-slate-400 ml-1">
+                    ({{ stats.total ? Math.round((tp.machines_count / stats.total) * 100) : 0 }}%)
+                  </span>
+                </span>
               </div>
-              <div class="text-xs text-slate-400 mt-0.5">{{ change.changed_by_name }}</div>
+              <div class="w-full bg-slate-100 rounded-full h-2">
+                <div
+                  class="h-2 rounded-full transition-all duration-700"
+                  :style="{
+                    width: typeStats[0].machines_count
+                      ? ((tp.machines_count / typeStats[0].machines_count) * 100) + '%'
+                      : '0%',
+                    backgroundColor: typeBarColors[i % typeBarColors.length],
+                  }"
+                ></div>
+              </div>
             </div>
-            <div class="flex items-center gap-1 text-xs text-slate-400 flex-shrink-0 tabular-nums">
-              {{ formatDate(change.changed_at) }}
-              <svg class="w-3.5 h-3.5 text-slate-300 opacity-0 group-hover:opacity-100
-                          transition-opacity duration-150"
-                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
-              </svg>
-            </div>
           </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Workshop summary -->
-    <div class="card p-6" v-if="auth.isAdmin || auth.isMaster">
-      <div class="flex items-center justify-between mb-5 pb-4 border-b border-slate-100">
-        <div class="section-header">
-          <div class="section-icon bg-violet-50">
-            <svg class="w-4 h-4 text-violet-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-            </svg>
-          </div>
-          <h3 class="section-title">{{ t('dashboard.workshops') }}</h3>
-        </div>
-        <RouterLink to="/directories"
-          class="inline-flex items-center gap-1 text-xs font-medium text-indigo-600
-                 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100
-                 border border-indigo-100 px-2.5 py-1 rounded-full
-                 transition-colors duration-150">
-          {{ t('dashboard.directories_link') }}
-          <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
-          </svg>
-        </RouterLink>
-      </div>
-      <div v-if="loading" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-        <div v-for="i in 4" :key="i" class="skeleton h-20 rounded-xl"></div>
-      </div>
-      <div v-else-if="workshopStats.length === 0"
-        class="text-sm text-slate-400 text-center py-8">{{ t('common.no_data') }}</div>
-      <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-        <div v-for="ws in workshopStats" :key="ws.id"
-          class="workshop-card cursor-pointer group"
-          @click="$router.push(`/machines?workshop=${ws.id}`)">
-          <div class="text-2xl font-bold text-slate-900 tabular-nums leading-none
-                      group-hover:text-indigo-600 transition-colors duration-200">
-            {{ ws.machines_count }}
-          </div>
-          <div class="text-xs font-medium text-slate-500 uppercase tracking-wide mt-2 truncate"
-            :title="ws.name">{{ ws.name }}</div>
         </div>
       </div>
     </div>
@@ -236,10 +258,20 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { useLangStore } from '@/store/lang'
 import { useI18n } from '@/i18n'
-import { machinesApi, statusesApi, workshopsApi } from '@/api'
+import { machinesApi, statusesApi, workshopsApi, machineTypesApi } from '@/api'
 import dayjs from 'dayjs'
 import 'dayjs/locale/ru'
 import 'dayjs/locale/uz'
+import { Doughnut, Bar, Line } from 'vue-chartjs'
+import {
+  Chart as ChartJS, ArcElement, BarElement, LineElement, PointElement,
+  CategoryScale, LinearScale, Tooltip, Legend, Filler,
+} from 'chart.js'
+
+ChartJS.register(
+  ArcElement, BarElement, LineElement, PointElement,
+  CategoryScale, LinearScale, Tooltip, Legend, Filler,
+)
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -250,64 +282,258 @@ const loadingHistory = ref(true)
 
 const stats = ref({ total: 0, working: 0, repair: 0, idle: 0 })
 const statusDistribution = ref([])
-const recentChanges = ref([])
 const workshopStats = ref([])
+const typeStats = ref([])
+const activityTrend = ref({ labels: [], counts: [] })
 
 const currentDate = computed(() => {
   const locale = langStore.lang === 'uz' ? 'uz' : 'ru'
   return dayjs().locale(locale).format('DD MMMM YYYY, dddd')
 })
 
-function barColorClass(color) {
-  const map = {
-    green: 'bg-emerald-500',
-    yellow: 'bg-amber-500',
-    red: 'bg-red-500',
-    gray: 'bg-slate-400',
-    blue: 'bg-blue-500',
-  }
-  return map[color] || 'bg-slate-400'
+const colorHex = {
+  green: '#10b981',
+  yellow: '#f59e0b',
+  red:   '#ef4444',
+  gray:  '#94a3b8',
+  blue:  '#3b82f6',
 }
 
-function formatDate(date) {
-  return dayjs(date).format('DD.MM HH:mm')
+const typeBarColors = [
+  '#6366f1', '#8b5cf6', '#3b82f6', '#0ea5e9',
+  '#10b981', '#f59e0b', '#f43f5e', '#64748b',
+]
+
+function pct(value) {
+  return stats.value.total ? Math.round((value / stats.value.total) * 100) : 0
+}
+
+const efficiency = computed(() => pct(stats.value.working))
+
+const fleetHealth = computed(() => {
+  const repairShare = pct(stats.value.repair)
+  if (!stats.value.total) return { level: 'good', label: t('dashboard.health_good') }
+  if (repairShare >= 20)  return { level: 'critical', label: t('dashboard.health_critical') }
+  if (repairShare >= 8)   return { level: 'warning', label: t('dashboard.health_warning') }
+  return { level: 'good', label: t('dashboard.health_good') }
+})
+
+// --- Doughnut ---
+const doughnutData = computed(() => ({
+  labels: statusDistribution.value.map(i => i.name),
+  datasets: [{
+    data: statusDistribution.value.map(i => i.count),
+    backgroundColor: statusDistribution.value.map(i => colorHex[i.color] || colorHex.gray),
+    borderWidth: 3,
+    borderColor: '#ffffff',
+    hoverOffset: 10,
+  }],
+}))
+
+const doughnutOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  cutout: '68%',
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      callbacks: {
+        label: (ctx) => ` ${ctx.label}: ${ctx.raw} (${Math.round((ctx.raw / (stats.value.total || 1)) * 100)}%)`,
+      },
+    },
+  },
+}
+
+// --- Activity stats ---
+const activityStats = computed(() => {
+  const counts = activityTrend.value.counts
+  const labels = activityTrend.value.labels
+  if (!counts.length) return { total: 0, max: 0, maxDay: '—', avg: '0' }
+  const total = counts.reduce((a, b) => a + b, 0)
+  const max   = Math.max(...counts)
+  const maxIdx = counts.indexOf(max)
+  return {
+    total,
+    max,
+    maxDay: labels[maxIdx] || '—',
+    avg: (total / counts.length).toFixed(1),
+  }
+})
+
+// --- Activity line chart with avg reference line ---
+const activityTrendData = computed(() => {
+  const avg = parseFloat(activityStats.value.avg) || 0
+  return {
+    labels: activityTrend.value.labels,
+    datasets: [
+      {
+        label: t('dashboard.changes_count'),
+        data: activityTrend.value.counts,
+        borderColor: '#6366f1',
+        backgroundColor: 'rgba(99,102,241,0.13)',
+        pointBackgroundColor: '#6366f1',
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 2,
+        pointRadius: 5,
+        pointHoverRadius: 7,
+        borderWidth: 3,
+        tension: 0.4,
+        fill: true,
+        order: 1,
+      },
+      {
+        label: 'avg',
+        data: activityTrend.value.counts.map(() => avg),
+        borderColor: 'rgba(99,102,241,0.4)',
+        borderDash: [6, 4],
+        borderWidth: 1.5,
+        pointRadius: 0,
+        pointHoverRadius: 0,
+        fill: false,
+        order: 2,
+      },
+    ],
+  }
+})
+
+const activityTrendOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  interaction: { mode: 'index', intersect: false },
+  scales: {
+    x: {
+      grid: { display: false },
+      ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 7, font: { size: 11 } },
+    },
+    y: {
+      beginAtZero: true,
+      ticks: { precision: 0, font: { size: 11 } },
+      grid: { color: '#f1f5f9' },
+    },
+  },
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      filter: (item) => item.datasetIndex === 0,
+      callbacks: {
+        label: (ctx) => ` ${t('dashboard.changes_count')}: ${ctx.raw}`,
+      },
+    },
+  },
+}
+
+// --- Workshops multi-color horizontal bar ---
+const workshopBarColors = [
+  '#6366f1', '#8b5cf6', '#a855f7', '#7c3aed',
+  '#4f46e5', '#3b82f6', '#0ea5e9', '#06b6d4',
+]
+
+const workshopChartData = computed(() => ({
+  labels: workshopStats.value.map(ws => ws.name),
+  datasets: [{
+    data: workshopStats.value.map(ws => ws.machines_count || 0),
+    backgroundColor: workshopStats.value.map((_, i) => workshopBarColors[i % workshopBarColors.length]),
+    borderRadius: 6,
+    maxBarThickness: 28,
+  }],
+}))
+
+const workshopChartOptions = computed(() => ({
+  indexAxis: 'y',
+  responsive: true,
+  maintainAspectRatio: false,
+  onClick: (evt, elements) => {
+    if (elements.length) {
+      const ws = workshopStats.value[elements[0].index]
+      if (ws) router.push(`/machines?workshop=${ws.id}`)
+    }
+  },
+  onHover: (evt, elements) => {
+    evt.native.target.style.cursor = elements.length ? 'pointer' : 'default'
+  },
+  scales: {
+    x: {
+      beginAtZero: true,
+      ticks: { precision: 0, font: { size: 12 } },
+      grid: { color: '#f1f5f9' },
+    },
+    y: {
+      grid: { display: false },
+      ticks: { font: { size: 12 } },
+    },
+  },
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      callbacks: {
+        label: (ctx) => ` ${workshopStats.value[ctx.dataIndex]?.name || ''}: ${ctx.raw} ta`,
+      },
+    },
+  },
+}))
+
+function chartHeight(itemsCount) {
+  return `${Math.max(220, itemsCount * 48)}px`
 }
 
 function goToStatus(key) {
   router.push(`/machines?status_color=${key}`)
 }
 
+function buildActivityTrend(machines) {
+  const days = 14
+  const today = dayjs().startOf('day')
+  const buckets = new Map()
+  for (let i = days - 1; i >= 0; i--) {
+    buckets.set(today.subtract(i, 'day').format('YYYY-MM-DD'), 0)
+  }
+  machines.forEach(m => {
+    if (!m.updated_at) return
+    const key = dayjs(m.updated_at).format('YYYY-MM-DD')
+    if (buckets.has(key)) buckets.set(key, buckets.get(key) + 1)
+  })
+  return {
+    labels: [...buckets.keys()].map(k => dayjs(k).format('DD.MM')),
+    counts: [...buckets.values()],
+  }
+}
+
 async function loadData() {
   try {
     loading.value = true
-
-    const [machinesRes, statusesRes, workshopsRes] = await Promise.all([
+    const [machinesRes, statusesRes, workshopsRes, typesRes] = await Promise.all([
       machinesApi.list({ page_size: 1 }),
       statusesApi.list(),
       workshopsApi.list(),
+      machineTypesApi.list(),
     ])
 
     const statuses = statusesRes.data.results || statusesRes.data
-    workshopStats.value = (workshopsRes.data.results || workshopsRes.data).slice(0, 8)
+    workshopStats.value = (workshopsRes.data.results || workshopsRes.data)
+      .slice()
+      .sort((a, b) => (b.machines_count || 0) - (a.machines_count || 0))
+      .slice(0, 8)
 
-    const distArr = []
+    typeStats.value = (typesRes.data.results || typesRes.data)
+      .filter(tp => (tp.machines_count || 0) > 0)
+      .slice()
+      .sort((a, b) => (b.machines_count || 0) - (a.machines_count || 0))
+      .slice(0, 8)
+
     let totalWorking = 0, totalRepair = 0, totalIdle = 0
+    statusDistribution.value = statuses.map(s => {
+      const count = s.machines_count || 0
+      if (s.color === 'green')  totalWorking += count
+      if (s.color === 'red')    totalRepair  += count
+      if (s.color === 'yellow') totalIdle    += count
+      return { name: s.name, count, color: s.color }
+    })
 
-    for (const s of statuses) {
-      const res = await machinesApi.list({ status: s.id, page_size: 1 })
-      const count = res.data.count || 0
-      distArr.push({ name: s.name, count, color: s.color, colorKey: s.color })
-      if (s.color === 'green') totalWorking += count
-      if (s.color === 'red') totalRepair += count
-      if (s.color === 'yellow') totalIdle += count
-    }
-
-    statusDistribution.value = distArr
     stats.value = {
-      total: machinesRes.data.count || 0,
+      total:   machinesRes.data.count || 0,
       working: totalWorking,
-      repair: totalRepair,
-      idle: totalIdle,
+      repair:  totalRepair,
+      idle:    totalIdle,
     }
   } catch (e) {
     console.error(e)
@@ -317,16 +543,8 @@ async function loadData() {
 
   try {
     loadingHistory.value = true
-    const res = await machinesApi.list({ page_size: 10, ordering: '-updated_at' })
-    const machines = res.data.results || []
-    recentChanges.value = machines.slice(0, 6).map(m => ({
-      id: m.id,
-      machine: m.id,
-      new_status_name: m.current_status_name || '—',
-      new_status_color: m.current_status_color || 'gray',
-      changed_by_name: m.operator_name || '—',
-      changed_at: m.updated_at,
-    }))
+    const res = await machinesApi.list({ page_size: 60, ordering: '-updated_at' })
+    activityTrend.value = buildActivityTrend(res.data.results || [])
   } catch (e) {
     console.error(e)
   } finally {
@@ -338,48 +556,68 @@ onMounted(loadData)
 </script>
 
 <style scoped>
-/* ── Section header ── */
-.section-header {
-  @apply flex items-center gap-3;
-}
-.section-icon {
-  @apply w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0;
-}
-.section-title {
-  @apply text-sm font-semibold text-slate-700;
-}
-
 /* ── KPI cards ── */
 .kpi-card {
-  @apply bg-white rounded-xl border border-slate-200 shadow-sm p-3 sm:p-5
-         flex items-center gap-3 sm:gap-4
-         transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md;
+  @apply bg-white rounded-2xl border border-slate-200 shadow-sm p-5
+         cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg;
 }
-.kpi-icon {
-  @apply w-9 h-9 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center flex-shrink-0;
+.kpi-icon  { @apply w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0; }
+.kpi-value { @apply text-4xl font-bold text-slate-900 leading-none tabular-nums; }
+.kpi-label { @apply text-sm text-slate-500 mt-1.5; }
+
+.kpi-indigo  { border-left: 4px solid #6366f1; }
+.kpi-emerald { border-left: 4px solid #10b981; }
+.kpi-rose    { border-left: 4px solid #f43f5e; }
+.kpi-amber   { border-left: 4px solid #f59e0b; }
+
+/* ── Progress bar ── */
+.progress-track {
+  @apply w-full bg-slate-100 rounded-full overflow-hidden;
+  height: 5px;
 }
-.kpi-value {
-  @apply text-xl sm:text-2xl font-bold text-slate-900 leading-none tabular-nums;
-}
-.kpi-label {
-  @apply text-xs sm:text-sm text-slate-500 mt-1;
+.progress-fill {
+  height: 5px;
+  border-radius: 9999px;
+  transition: width 0.7s ease;
+  min-width: 2px;
 }
 
-/* ── KPI accent left border ── */
-.kpi-indigo  { border-left: 3px solid #6366f1; }
-.kpi-emerald { border-left: 3px solid #10b981; }
-.kpi-rose    { border-left: 3px solid #f43f5e; }
-.kpi-amber   { border-left: 3px solid #f59e0b; }
+/* ── Chart header ── */
+.chart-header { @apply flex items-center justify-between; }
+.chart-title  { @apply text-sm font-semibold text-slate-700; }
+.chart-link   {
+  @apply inline-flex items-center gap-1 text-xs font-medium text-indigo-600
+         hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100
+         border border-indigo-100 px-2.5 py-1 rounded-full
+         transition-colors duration-150;
+}
+.no-data  { @apply text-sm text-slate-400 text-center py-10; }
+.chart-box { @apply relative w-full; }
 
-/* ── Workshop card ── */
-.workshop-card {
-  @apply bg-slate-50 hover:bg-white border border-slate-200 hover:border-indigo-100
-         rounded-xl p-3 sm:p-4 shadow-sm hover:shadow-md
-         transition-all duration-200 hover:-translate-y-0.5;
+/* ── Activity mini stats ── */
+.stat-mini { @apply transition-colors duration-150; }
+
+/* ── Leaderboard ── */
+.leaderboard-row {
+  @apply flex items-center gap-3 p-2.5 rounded-xl
+         cursor-pointer transition-all duration-150
+         hover:bg-slate-50 hover:-translate-y-px;
+}
+.rank-badge {
+  @apply w-7 h-7 rounded-lg flex items-center justify-center
+         text-xs font-bold flex-shrink-0;
 }
 
-/* ── Reduced motion ── */
+/* ── Health badge ── */
+.health-badge {
+  @apply inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5
+         rounded-full border flex-shrink-0;
+}
+.health-good     { @apply bg-emerald-50 text-emerald-600 border-emerald-100; }
+.health-warning  { @apply bg-amber-50   text-amber-600   border-amber-100;  }
+.health-critical { @apply bg-rose-50    text-rose-600    border-rose-100;   }
+
 @media (prefers-reduced-motion: reduce) {
-  .kpi-card, .workshop-card { transition: none; }
+  .kpi-card, .progress-fill, .leaderboard-row { transition: none; }
 }
 </style>
