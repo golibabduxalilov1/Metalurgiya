@@ -185,6 +185,127 @@ class MachineViewSet(viewsets.ModelViewSet):
         serializer = MachineStatusHistorySerializer(history, many=True)
         return Response(serializer.data)
 
+    @extend_schema(summary='Статистика работы станков за период')
+    @action(detail=False, methods=['get'], url_path='period-stats')
+    def period_stats(self, request):
+        import datetime as dt
+        from django.utils.dateparse import parse_date
+        from django.utils import timezone as tz_utils
+
+        date_from_str = request.query_params.get('date_from')
+        date_to_str = request.query_params.get('date_to')
+
+        today = tz_utils.now().date()
+        d_from = parse_date(date_from_str) if date_from_str else today - dt.timedelta(days=6)
+        d_to = parse_date(date_to_str) if date_to_str else today
+
+        if not d_from or not d_to or d_from > d_to:
+            return Response({'detail': 'Неверный диапазон дат'}, status=status.HTTP_400_BAD_REQUEST)
+
+        dt_from = dt.datetime.combine(d_from, dt.time.min, tzinfo=dt.timezone.utc)
+        # Bugungi kun uchun — hozirgi vaqtgacha, o'tgan kunlar uchun — kun oxirigacha
+        if d_to >= today:
+            dt_to = tz_utils.now()
+        else:
+            dt_to = dt.datetime.combine(d_to, dt.time.max, tzinfo=dt.timezone.utc)
+
+        machines = Machine.objects.filter(deleted_at__isnull=True).select_related('current_status')
+
+        num_days = (d_to - d_from).days + 1
+        daily_buckets = [
+            {
+                'date': (d_from + dt.timedelta(days=i)).strftime('%d.%m.%Y'),
+                'green': 0.0, 'red': 0.0, 'yellow': 0.0,
+            }
+            for i in range(num_days)
+        ]
+        color_totals = {'green': 0.0, 'red': 0.0, 'yellow': 0.0}
+
+        def add_segment(seg_s, seg_e, color):
+            if seg_s >= seg_e or color not in color_totals:
+                return
+            color_totals[color] += (seg_e - seg_s).total_seconds()
+            cur = seg_s
+            while cur < seg_e:
+                idx = (cur.date() - d_from).days
+                next_day = dt.datetime.combine(
+                    cur.date() + dt.timedelta(days=1), dt.time.min, tzinfo=dt.timezone.utc
+                )
+                chunk_end = min(seg_e, next_day)
+                if 0 <= idx < num_days:
+                    daily_buckets[idx][color] += (chunk_end - cur).total_seconds()
+                cur = next_day
+
+        for machine in machines:
+            history = list(
+                MachineStatusHistory.objects.filter(
+                    machine=machine,
+                    changed_at__lte=dt_to,
+                ).select_related('new_status', 'previous_status').order_by('changed_at')
+            )
+
+            last_before = None
+            in_period = []
+            for h in history:
+                if h.changed_at < dt_from:
+                    last_before = h
+                else:
+                    in_period.append(h)
+
+            # Stanok yaratilgan vaqtdan oldingi vaqtni sanama
+            machine_start = max(dt_from, machine.created_at) if machine.created_at else dt_from
+            # Stanok davr tugagandan keyin yaratilgan bo'lsa — o'tkazib yubor
+            if machine_start >= dt_to:
+                continue
+
+            if last_before and last_before.new_status:
+                # Davrdan OLDIN oxirgi holat o'zgarishi → o'sha holat bilan boshlash
+                cur_color = last_before.new_status.color
+            elif in_period and in_period[0].previous_status:
+                # Davrdan oldin tarix yo'q, lekin davr ichida o'zgarish bor →
+                # birinchi o'zgarishning oldingi holati = davr boshidagi haqiqiy holat
+                cur_color = in_period[0].previous_status.color
+            elif not in_period:
+                # Hech qanday tarix yo'q → joriy holat stanok yaratilganidan beri saqlanib kelgan
+                cur_color = machine.current_status.color if machine.current_status else 'gray'
+            else:
+                # Birinchi o'zgarishning previous_status si null → holat noma'lum, sanama
+                cur_color = None
+
+            prev = machine_start  # dt_from emas, stanok yaratilgan vaqtdan boshlash
+            for hist in in_period:
+                # Davrdan oldin bo'lgan o'zgarishlarni o'tkazib yuborish
+                if hist.changed_at <= machine_start:
+                    cur_color = hist.new_status.color if hist.new_status else 'gray'
+                    continue
+                add_segment(prev, hist.changed_at, cur_color)
+                cur_color = hist.new_status.color if hist.new_status else 'gray'
+                prev = hist.changed_at
+            add_segment(prev, dt_to, cur_color)
+
+        def to_h(s):
+            return round(s / 3600, 1)
+
+        total_s = sum(color_totals.values())
+
+        return Response({
+            'date_from': d_from.isoformat(),
+            'date_to': d_to.isoformat(),
+            'working_hours': to_h(color_totals['green']),
+            'repair_hours': to_h(color_totals['red']),
+            'idle_hours': to_h(color_totals['yellow']),
+            'total_hours': to_h(total_s),
+            'working_pct': round(color_totals['green'] / total_s * 100, 1) if total_s else 0,
+            'repair_pct': round(color_totals['red'] / total_s * 100, 1) if total_s else 0,
+            'idle_pct': round(color_totals['yellow'] / total_s * 100, 1) if total_s else 0,
+            'daily': [{
+                'date': b['date'],
+                'working_hours': to_h(b['green']),
+                'repair_hours': to_h(b['red']),
+                'idle_hours': to_h(b['yellow']),
+            } for b in daily_buckets],
+        })
+
     @extend_schema(summary='Загрузить файл к станку', request=MachineAttachmentCreateSerializer)
     @action(detail=True, methods=['post'], url_path='upload',
             parser_classes=[MultiPartParser, FormParser])

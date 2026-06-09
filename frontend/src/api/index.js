@@ -94,6 +94,7 @@ export const machinesApi = {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
   assignOperator: (id, data) => api.post(`/machines/${id}/assign-operator/`, data),
+  periodStats: (params) => api.get('/machines/period-stats/', { params }),
   exportExcel: (params) => api.get('/machines/export-excel/', {
     params, responseType: 'blob'
   }),

@@ -2,18 +2,47 @@
   <div class="animate-fade-in space-y-5">
 
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-start justify-between gap-3">
       <div>
         <h1 class="text-xl font-bold text-slate-900">{{ t('dashboard.title') }}</h1>
         <p class="text-xs text-slate-400 mt-0.5">{{ currentDate }}</p>
       </div>
+
+      <!-- Period picker -->
+      <div class="flex flex-wrap items-center gap-2">
+        <!-- Presets -->
+        <div class="flex gap-1">
+          <button
+            v-for="p in presets" :key="p.key"
+            @click="applyPreset(p)"
+            :class="['period-preset', activePreset === p.key ? 'period-preset--active' : '']"
+          >{{ t(`dashboard.${p.key}`) }}</button>
+        </div>
+        <!-- Date inputs -->
+        <div class="period-range-box">
+          <svg class="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+          </svg>
+          <input type="date" v-model="periodFrom" @change="onPeriodChange" class="period-date-input" />
+          <span class="text-slate-300 text-xs">—</span>
+          <input type="date" v-model="periodTo" @change="onPeriodChange" class="period-date-input" />
+        </div>
+      </div>
+
+      <!-- Health / time badge -->
       <div :class="['health-badge', `health-${fleetHealth.level}`]">
         <span class="w-1.5 h-1.5 rounded-full flex-shrink-0" :class="{
           'bg-emerald-500': fleetHealth.level === 'good',
           'bg-amber-500':   fleetHealth.level === 'warning',
           'bg-rose-500':    fleetHealth.level === 'critical',
         }"></span>
-        {{ fleetHealth.label }}
+        <template v-if="periodStats">
+          {{ periodStats.working_hours }} {{ t('dashboard.period_hours') }}
+        </template>
+        <template v-else>
+          {{ fleetHealth.label }}
+        </template>
       </div>
     </div>
 
@@ -104,6 +133,57 @@
         </div>
         <div class="progress-track"><div class="progress-fill bg-amber-500" :style="{ width: pct(stats.idle) + '%' }"></div></div>
       </div>
+    </div>
+
+    <!-- Period Stats -->
+    <div class="card p-5">
+      <div class="chart-header mb-4">
+        <div>
+          <h3 class="chart-title">{{ t('dashboard.period_title') }}</h3>
+          <p class="text-[11px] text-slate-400 mt-0.5">{{ t('dashboard.period_all_machines') }}</p>
+        </div>
+        <div v-if="loadingPeriod" class="text-xs text-slate-400 flex items-center gap-1.5">
+          <span class="w-3 h-3 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin"></span>
+          Yuklanmoqda...
+        </div>
+      </div>
+
+      <div v-if="loadingPeriod && !periodStats" class="skeleton rounded-xl" style="height:200px"></div>
+
+      <template v-else-if="periodStats">
+        <!-- Three time cards -->
+        <div class="grid grid-cols-3 gap-3 mb-4">
+          <div class="period-stat-card period-stat-green">
+            <div class="period-stat-value text-emerald-700">
+              {{ periodStats.working_hours }}
+              <span class="period-stat-unit">{{ t('dashboard.period_hours') }}</span>
+            </div>
+            <div class="period-stat-label text-emerald-500">{{ t('dashboard.period_working') }}</div>
+          </div>
+          <div class="period-stat-card period-stat-red">
+            <div class="period-stat-value text-rose-600">
+              {{ periodStats.repair_hours }}
+              <span class="period-stat-unit">{{ t('dashboard.period_hours') }}</span>
+            </div>
+            <div class="period-stat-label text-rose-400">{{ t('dashboard.period_repair') }}</div>
+          </div>
+          <div class="period-stat-card period-stat-amber">
+            <div class="period-stat-value text-amber-600">
+              {{ periodStats.idle_hours }}
+              <span class="period-stat-unit">{{ t('dashboard.period_hours') }}</span>
+            </div>
+            <div class="period-stat-label text-amber-500">{{ t('dashboard.period_idle') }}</div>
+          </div>
+        </div>
+
+
+        <!-- Daily stacked bar chart -->
+        <div style="height:200px">
+          <Bar :data="periodChartData" :options="periodChartOptions" />
+        </div>
+      </template>
+
+      <div v-else class="no-data">{{ t('common.no_data') }}</div>
     </div>
 
     <!-- Row 2: Donut + Line -->
@@ -286,6 +366,110 @@ const workshopStats = ref([])
 const typeStats = ref([])
 const activityTrend = ref({ labels: [], counts: [] })
 
+// ── Period picker ──
+const periodFrom = ref(dayjs().subtract(6, 'day').format('YYYY-MM-DD'))
+const periodTo   = ref(dayjs().format('YYYY-MM-DD'))
+const activePreset = ref('period_week')
+const loadingPeriod = ref(false)
+const periodStats = ref(null)
+
+const presets = [
+  { key: 'period_today',      from: () => dayjs().format('YYYY-MM-DD'),                      to: () => dayjs().format('YYYY-MM-DD') },
+  { key: 'period_week',       from: () => dayjs().subtract(6, 'day').format('YYYY-MM-DD'),   to: () => dayjs().format('YYYY-MM-DD') },
+  { key: 'period_month',      from: () => dayjs().subtract(29, 'day').format('YYYY-MM-DD'),  to: () => dayjs().format('YYYY-MM-DD') },
+  { key: 'period_this_month', from: () => dayjs().startOf('month').format('YYYY-MM-DD'),     to: () => dayjs().format('YYYY-MM-DD') },
+]
+
+function applyPreset(p) {
+  activePreset.value = p.key
+  periodFrom.value = p.from()
+  periodTo.value   = p.to()
+  loadPeriodStats()
+}
+
+function onPeriodChange() {
+  activePreset.value = ''
+  loadPeriodStats()
+}
+
+async function loadPeriodStats() {
+  loadingPeriod.value = true
+  try {
+    const res = await machinesApi.periodStats({ date_from: periodFrom.value, date_to: periodTo.value })
+    periodStats.value = res.data
+  } catch (e) {
+    console.error(e)
+    periodStats.value = null
+  } finally {
+    loadingPeriod.value = false
+  }
+}
+
+// ── Period chart ──
+const periodChartData = computed(() => {
+  const daily = periodStats.value?.daily ?? []
+  return {
+    labels: daily.map(d => d.date),
+    datasets: [
+      {
+        label: t('dashboard.period_working'),
+        data: daily.map(d => d.working_hours),
+        backgroundColor: '#10b981',
+        stack: 'time',
+        borderRadius: 3,
+        maxBarThickness: 32,
+      },
+      {
+        label: t('dashboard.period_repair'),
+        data: daily.map(d => d.repair_hours),
+        backgroundColor: '#f43f5e',
+        stack: 'time',
+        maxBarThickness: 32,
+      },
+      {
+        label: t('dashboard.period_idle'),
+        data: daily.map(d => d.idle_hours),
+        backgroundColor: '#f59e0b',
+        stack: 'time',
+        maxBarThickness: 32,
+      },
+    ],
+  }
+})
+
+const periodChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  interaction: { mode: 'index', intersect: false },
+  scales: {
+    x: {
+      grid: { display: false },
+      stacked: true,
+      ticks: { font: { size: 11 }, maxRotation: 30, minRotation: 30, autoSkip: true, maxTicksLimit: 14 },
+    },
+    y: {
+      stacked: true,
+      beginAtZero: true,
+      ticks: { font: { size: 11 } },
+      grid: { color: '#f1f5f9' },
+      title: { display: true, text: 'soat', font: { size: 10 }, color: '#94a3b8' },
+    },
+  },
+  plugins: {
+    legend: {
+      display: true,
+      position: 'bottom',
+      labels: { boxWidth: 10, boxHeight: 10, font: { size: 11 }, padding: 12 },
+    },
+    tooltip: {
+      callbacks: {
+        label: (ctx) => ` ${ctx.dataset.label}: ${ctx.raw} soat`,
+      },
+    },
+  },
+}
+
+// ── Rest of existing code ──
 const currentDate = computed(() => {
   const locale = langStore.lang === 'uz' ? 'uz' : 'ru'
   return dayjs().locale(locale).format('DD MMMM YYYY, dddd')
@@ -552,7 +736,10 @@ async function loadData() {
   }
 }
 
-onMounted(loadData)
+onMounted(() => {
+  loadData()
+  loadPeriodStats()
+})
 </script>
 
 <style scoped>
@@ -581,6 +768,44 @@ onMounted(loadData)
   transition: width 0.7s ease;
   min-width: 2px;
 }
+
+/* ── Period picker ── */
+.period-range-box {
+  @apply flex items-center gap-1.5 bg-white border border-slate-200
+         rounded-xl px-3 py-1.5 shadow-sm;
+}
+.period-date-input {
+  @apply text-xs text-slate-700 bg-transparent outline-none border-none
+         cursor-pointer;
+  font-family: inherit;
+  min-width: 0;
+}
+.period-date-input::-webkit-calendar-picker-indicator {
+  opacity: 0.5;
+  cursor: pointer;
+}
+.period-preset {
+  @apply text-xs font-medium px-2.5 py-1 rounded-lg border border-slate-200
+         bg-white text-slate-600 hover:bg-indigo-50 hover:border-indigo-200
+         hover:text-indigo-600 transition-colors duration-150 cursor-pointer;
+}
+.period-preset--active {
+  @apply bg-indigo-50 border-indigo-200 text-indigo-600;
+}
+
+/* ── Period stat cards ── */
+.period-stat-card {
+  @apply rounded-xl p-3 border;
+}
+.period-stat-green { @apply bg-emerald-50 border-emerald-100; }
+.period-stat-red   { @apply bg-rose-50 border-rose-100; }
+.period-stat-amber { @apply bg-amber-50 border-amber-100; }
+
+.period-stat-value {
+  @apply text-2xl font-bold tabular-nums leading-none;
+}
+.period-stat-unit  { @apply text-sm font-normal ml-0.5; }
+.period-stat-label { @apply text-[10px] uppercase tracking-wide font-medium mt-1; }
 
 /* ── Chart header ── */
 .chart-header { @apply flex items-center justify-between; }

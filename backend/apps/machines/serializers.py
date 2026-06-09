@@ -197,6 +197,7 @@ class MachineCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Machine
         fields = [
+            'id',
             'name', 'inventory_number', 'model', 'manufacturer',
             'year_manufactured', 'commissioned_date',
             'machine_type', 'current_status',
@@ -204,6 +205,7 @@ class MachineCreateUpdateSerializer(serializers.ModelSerializer):
             'assigned_operator', 'assigned_brigade', 'description',
             'initial_cost', 'useful_life_years', 'residual_value',
         ]
+        read_only_fields = ['id']
 
     def validate_inventory_number(self, value):
         qs = Machine.objects.filter(inventory_number=value)
