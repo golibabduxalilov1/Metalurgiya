@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from utils.permissions import IsAdmin, IsAdminOrMaster
+from utils.permissions import IsAdmin, IsAdminOrMaster, section_access
 from .serializers import (
     CustomTokenObtainPairSerializer, UserListSerializer, UserDetailSerializer,
     UserCreateSerializer, UserUpdateSerializer, ChangePasswordSerializer,
@@ -99,7 +99,11 @@ class UserViewSet(viewsets.ModelViewSet):
     Управление пользователями системы (только для администраторов).
     """
     queryset = User.objects.all().order_by('last_name', 'first_name')
-    permission_classes = [IsAdmin]
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            return [section_access('users')()]
+        return [IsAdmin()]
 
     def get_serializer_class(self):
         if self.action == 'create':

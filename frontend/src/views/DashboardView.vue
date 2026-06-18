@@ -52,7 +52,7 @@
     </div>
 
     <!-- KPI Cards -->
-    <div v-else class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
       <div class="kpi-card kpi-indigo" @click="$router.push('/machines')">
         <div class="flex items-start justify-between mb-4">

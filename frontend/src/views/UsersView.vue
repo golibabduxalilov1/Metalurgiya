@@ -302,6 +302,38 @@
               <label class="form-label">{{ t('common.phone') }}</label>
               <input v-model="form.phone" type="tel" class="form-input" placeholder="+998 90 000 00 00"/>
             </div>
+            <!-- Section access restriction -->
+            <div class="pt-1 border-t border-slate-100">
+              <div class="flex items-center justify-between gap-3">
+                <div class="min-w-0">
+                  <p class="text-sm font-medium text-slate-700">{{ t('users.form_section_access') }}</p>
+                  <p class="text-xs text-slate-400 mt-0.5">{{ t('users.form_section_access_hint') }}</p>
+                </div>
+                <button type="button" @click="sectionRestrict = !sectionRestrict"
+                  :class="sectionRestrict ? 'bg-indigo-600' : 'bg-slate-200'"
+                  class="relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full
+                         transition-colors duration-200 focus:outline-none cursor-pointer">
+                  <span :class="sectionRestrict ? 'translate-x-6' : 'translate-x-1'"
+                    class="inline-block h-4 w-4 rounded-full bg-white transition-transform duration-200 shadow-sm"></span>
+                </button>
+              </div>
+              <Transition name="section-expand">
+                <div v-if="sectionRestrict" class="mt-3 space-y-1.5">
+                  <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
+                    {{ t('users.form_section_access_select') }}
+                  </p>
+                  <label v-for="sec in ALL_SECTIONS" :key="sec.key"
+                    class="flex items-center gap-2.5 px-2 py-1.5 rounded-lg
+                           hover:bg-slate-50 cursor-pointer transition-colors duration-100 select-none">
+                    <input type="checkbox" :value="sec.key" v-model="formAllowedSections"
+                      class="w-4 h-4 rounded border-slate-300 text-indigo-600
+                             focus:ring-indigo-500/30 cursor-pointer"/>
+                    <span class="text-sm text-slate-700">{{ t('nav.' + sec.navKey) }}</span>
+                  </label>
+                </div>
+              </Transition>
+            </div>
+
             <template v-if="!editUser">
               <div class="pt-1 border-t border-slate-100">
                 <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">{{ t('users.form_password_section') }}</p>
@@ -434,6 +466,18 @@ const saving = ref(false)
 const resetTarget = ref(null)
 const newPassword = ref('')
 const deactivateTarget = ref(null)
+const sectionRestrict = ref(false)
+const formAllowedSections = ref([])
+
+const ALL_SECTIONS = [
+  { key: 'machines', navKey: 'machines' },
+  { key: 'employees', navKey: 'employees' },
+  { key: 'directories', navKey: 'directories' },
+  { key: 'users', navKey: 'users' },
+  { key: 'audit', navKey: 'audit' },
+  { key: 'maintenance', navKey: 'maintenance' },
+  { key: 'sklad', navKey: 'sklad' },
+]
 
 const form = reactive({
   username: '', email: '', first_name: '', last_name: '', patronymic: '',
@@ -460,24 +504,35 @@ async function loadUsers() {
 function openCreate() {
   editUser.value = null
   Object.assign(form, { username: '', email: '', first_name: '', last_name: '', patronymic: '', role: 'operator', phone: '', password: '', password_confirm: '' })
+  sectionRestrict.value = false
+  formAllowedSections.value = []
   showModal.value = true
 }
 
 function openEdit(user) {
   editUser.value = user
   Object.assign(form, { ...user, password: '', password_confirm: '' })
+  if (user.allowed_sections) {
+    sectionRestrict.value = true
+    formAllowedSections.value = [...user.allowed_sections]
+  } else {
+    sectionRestrict.value = false
+    formAllowedSections.value = []
+  }
   showModal.value = true
 }
 
 async function handleSave() {
   saving.value = true
   try {
+    const allowedSections = sectionRestrict.value ? formAllowedSections.value : null
     if (editUser.value) {
       const { password, password_confirm, ...data } = form
+      data.allowed_sections = allowedSections
       await usersApi.update(editUser.value.id, data)
       toast.success(t('toast.user_updated'))
     } else {
-      await usersApi.create(form)
+      await usersApi.create({ ...form, allowed_sections: allowedSections })
       toast.success(t('toast.user_created'))
     }
     showModal.value = false
@@ -577,6 +632,10 @@ onMounted(loadUsers)
 .modal-fade-leave-active { transition: opacity 0.2s ease; }
 .modal-fade-enter-from,
 .modal-fade-leave-to { opacity: 0; }
+.section-expand-enter-active { transition: opacity 0.2s ease, max-height 0.25s ease; max-height: 400px; }
+.section-expand-leave-active { transition: opacity 0.15s ease, max-height 0.2s ease; max-height: 400px; }
+.section-expand-enter-from,
+.section-expand-leave-to { opacity: 0; max-height: 0; }
 @media (prefers-reduced-motion: reduce) {
   .modal-enter, .user-row { animation: none; transition: none; }
 }

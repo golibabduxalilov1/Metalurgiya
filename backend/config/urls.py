@@ -21,6 +21,8 @@ api_v1_urlpatterns = [
     path('workshops/', include('apps.workshops.urls')),
     path('employees/', include('apps.employees.urls')),
     path('audit/', include('apps.audit.urls')),
+    path('maintenance/', include('apps.machines.urls.maintenance')),
+    path('spare-parts/', include('apps.warehouse.urls')),
 ]
 
 urlpatterns = [

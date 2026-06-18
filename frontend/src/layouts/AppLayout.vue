@@ -19,17 +19,12 @@
       ]"
     >
       <!-- Logo -->
-      <div class="flex items-center gap-3 px-4 py-5 border-b border-slate-100">
-        <div class="flex-shrink-0 w-9 h-9 rounded-xl overflow-hidden shadow-md shadow-indigo-500/25">
-          <img src="@/assets/logo.jpg" alt="Logo" class="w-full h-full object-cover" />
-        </div>
+      <RouterLink to="/dashboard" class="flex justify-center items-center px-4 py-5 border-b border-slate-100">
         <Transition name="fade">
-          <div v-if="sidebarShowContent" class="overflow-hidden">
-            <div class="text-slate-800 font-bold text-sm leading-tight">Lazana</div>
-            <div class="text-slate-400 text-xs mt-0.5">{{ t('nav.equipment_registry') }}</div>
-          </div>
+          <img v-if="sidebarShowContent" src="@/assets/logo.svg" alt="Logo" class="h-8 w-auto" />
+          <img v-else src="@/assets/logo.svg" alt="Logo" class="h-7 w-7 object-contain" />
         </Transition>
-      </div>
+      </RouterLink>
 
       <!-- Navigation -->
       <nav class="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
@@ -41,7 +36,7 @@
           :item="item" :collapsed="sidebarCollapsed && !mobileMenuOpen" />
 
         <!-- Management -->
-        <template v-if="auth.isAdmin || auth.isMaster">
+        <template v-if="managementNavItems.length > 0">
           <div v-if="sidebarShowContent" class="px-3 mt-5 mb-1.5">
             <span class="text-[10px] font-semibold  uppercase tracking-widest">{{ t('nav.management') }}</span>
           </div>
@@ -50,8 +45,8 @@
             :item="item" :collapsed="sidebarCollapsed && !mobileMenuOpen" />
         </template>
 
-        <!-- Admin only -->
-        <template v-if="auth.isAdmin">
+        <!-- Admin / Extended access -->
+        <template v-if="adminNavItems.length > 0">
           <div v-if="sidebarShowContent" class="px-3 mt-5 mb-1.5">
             <span class="text-[10px] font-semibold  uppercase tracking-widest">{{ t('nav.administration') }}</span>
           </div>
@@ -136,12 +131,103 @@
         </button>
 
         <!-- Notifications -->
-        <button class="relative p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer flex-shrink-0">
-          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-          </svg>
-        </button>
+        <div class="relative" ref="notifRef">
+          <button @click="notifOpen = !notifOpen"
+            class="relative p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer flex-shrink-0">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+            <span v-if="maintenanceBadgeCount > 0"
+              class="absolute top-1 right-1 min-w-[16px] h-4 px-0.5 rounded-full text-[10px] font-bold
+                     flex items-center justify-center leading-none
+                     text-white pointer-events-none"
+              :class="maintenanceAlerts.overdue_count > 0 ? 'bg-rose-500' : 'bg-amber-500'">
+              {{ maintenanceBadgeCount > 99 ? '99+' : maintenanceBadgeCount }}
+            </span>
+          </button>
+
+          <!-- Dropdown -->
+          <Transition name="notif-drop">
+            <div v-if="notifOpen"
+              class="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl border border-slate-200
+                     shadow-xl shadow-slate-200/60 z-50 overflow-hidden">
+              <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                <span class="text-sm font-semibold text-slate-800">{{ t('nav.notifications') }}</span>
+                <span v-if="maintenanceBadgeCount > 0"
+                  class="text-xs font-bold px-2 py-0.5 rounded-full"
+                  :class="maintenanceAlerts.overdue_count > 0 ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-600'">
+                  {{ maintenanceBadgeCount }}
+                </span>
+              </div>
+
+              <div v-if="maintenanceBadgeCount === 0 && maintenanceAlerts.warning_count === 0"
+                class="px-4 py-6 text-center text-slate-400 text-sm">
+                {{ t('nav.no_notifications') }}
+              </div>
+
+              <div v-else class="divide-y divide-slate-50">
+                <RouterLink v-if="maintenanceAlerts.overdue_count > 0" to="/maintenance"
+                  @click="notifOpen = false"
+                  class="flex items-center gap-3 px-4 py-3 hover:bg-rose-50 transition-colors group">
+                  <span class="w-8 h-8 rounded-xl bg-rose-100 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-4 h-4 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                  </span>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-semibold text-rose-700">{{ t('maintenance.alert_overdue') }}</p>
+                    <p class="text-xs text-slate-500">{{ maintenanceAlerts.overdue_count }} {{ t('maintenance.alert_banner_overdue') }}</p>
+                  </div>
+                  <svg class="w-4 h-4 text-slate-300 group-hover:text-rose-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                  </svg>
+                </RouterLink>
+
+                <RouterLink v-if="maintenanceAlerts.critical_count > 0" to="/maintenance"
+                  @click="notifOpen = false"
+                  class="flex items-center gap-3 px-4 py-3 hover:bg-amber-50 transition-colors group">
+                  <span class="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                  </span>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-semibold text-amber-700">{{ t('maintenance.alert_critical') }}</p>
+                    <p class="text-xs text-slate-500">{{ maintenanceAlerts.critical_count }} {{ t('maintenance.alert_banner_critical') }}</p>
+                  </div>
+                  <svg class="w-4 h-4 text-slate-300 group-hover:text-amber-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                  </svg>
+                </RouterLink>
+
+                <RouterLink v-if="maintenanceAlerts.warning_count > 0" to="/maintenance"
+                  @click="notifOpen = false"
+                  class="flex items-center gap-3 px-4 py-3 hover:bg-yellow-50 transition-colors group">
+                  <span class="w-8 h-8 rounded-xl bg-yellow-100 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-4 h-4 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                  </span>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-semibold text-yellow-700">{{ t('maintenance.alert_warning') }}</p>
+                    <p class="text-xs text-slate-500">{{ maintenanceAlerts.warning_count }} {{ t('maintenance.alert_banner_warning') }}</p>
+                  </div>
+                  <svg class="w-4 h-4 text-slate-300 group-hover:text-yellow-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                  </svg>
+                </RouterLink>
+              </div>
+
+              <div v-if="maintenanceBadgeCount > 0" class="px-4 py-2.5 border-t border-slate-100 bg-slate-50">
+                <RouterLink to="/maintenance" @click="notifOpen = false"
+                  class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors">
+                  {{ t('maintenance.alert_banner_link') }} →
+                </RouterLink>
+              </div>
+            </div>
+          </Transition>
+        </div>
 
         <!-- User avatar -->
         <RouterLink to="/profile"
@@ -168,12 +254,13 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { RouterView, RouterLink, useRoute } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { useLangStore } from '@/store/lang'
 import { useI18n } from '@/i18n'
 import NavItem from '@/components/common/NavItem.vue'
+import { maintenanceApi } from '@/api'
 
 const auth = useAuthStore()
 const langStore = useLangStore()
@@ -181,6 +268,39 @@ const { t } = useI18n()
 const route = useRoute()
 const sidebarCollapsed = ref(false)
 const mobileMenuOpen = ref(false)
+
+const maintenanceAlerts = ref({ overdue_count: 0, critical_count: 0, warning_count: 0, total: 0 })
+const notifOpen = ref(false)
+const notifRef = ref(null)
+
+function handleOutsideClick(e) {
+  if (notifRef.value && !notifRef.value.contains(e.target)) {
+    notifOpen.value = false
+  }
+}
+
+onUnmounted(() => document.removeEventListener('click', handleOutsideClick))
+
+async function loadMaintenanceAlerts() {
+  try {
+    const res = await maintenanceApi.alerts()
+    maintenanceAlerts.value = res.data
+  } catch {
+    // silently fail
+  }
+}
+
+onMounted(() => {
+  if (auth.isAdmin) loadMaintenanceAlerts()
+  document.addEventListener('click', handleOutsideClick)
+})
+
+watch(() => route.path, () => {
+  mobileMenuOpen.value = false
+  if (auth.isAdmin && (route.path === '/dashboard' || route.path === '/machines' || route.path === '/maintenance')) {
+    loadMaintenanceAlerts()
+  }
+})
 
 const sidebarShowContent = computed(() => !sidebarCollapsed.value || mobileMenuOpen.value)
 
@@ -192,9 +312,6 @@ function toggleMenu() {
   }
 }
 
-watch(() => route.path, () => {
-  mobileMenuOpen.value = false
-})
 
 const userInitials = computed(() => {
   const name = auth.userFullName
@@ -211,11 +328,17 @@ const routeTitleMap = {
   MachineDetail: 'nav.machine_card',
   MachineEdit: 'nav.machine_edit',
   Employees: 'nav.employees',
+  Sklad: 'nav.sklad',
   Directories: 'nav.directories',
   Users: 'nav.users',
   Audit: 'nav.audit',
+  Maintenance: 'nav.maintenance',
   Profile: 'nav.profile',
 }
+
+const maintenanceBadgeCount = computed(() => {
+  return maintenanceAlerts.value.overdue_count + maintenanceAlerts.value.critical_count
+})
 
 const currentPageTitle = computed(() => {
   const key = routeTitleMap[route.name]
@@ -229,22 +352,64 @@ const roleBadgeClass = computed(() => {
   return 'role-operator'
 })
 
-const mainNavItems = computed(() => [
-  { name: 'Dashboard', label: t('nav.home'), icon: 'home', to: '/dashboard' },
-  { name: 'Machines', label: t('nav.machines'), icon: 'cog', to: '/machines' },
-])
+// Returns true if the current user can access a section.
+// When allowed_sections is null → use role-based defaults.
+// When allowed_sections is set → only sections explicitly listed are accessible.
+function canAccess(section, baseRoles) {
+  const allowedSections = auth.user?.allowed_sections
+  if (allowedSections) {
+    return allowedSections.includes(section)
+  }
+  return baseRoles.includes(auth.user?.role)
+}
 
-const managementNavItems = computed(() => {
-  const items = []
-  if (auth.isAdmin || auth.isMaster) {
-    items.push({ name: 'Employees', label: t('nav.employees'), icon: 'users', to: '/employees' })
+const mainNavItems = computed(() => {
+  const items = [{ name: 'Dashboard', label: t('nav.home'), icon: 'home', to: '/dashboard' }]
+  if (canAccess('machines', ['admin', 'master', 'operator'])) {
+    items.push({ name: 'Machines', label: t('nav.machines'), icon: 'cog', to: '/machines' })
   }
   return items
 })
 
-const adminNavItems = computed(() => [
-  { name: 'Directories', label: t('nav.directories'), icon: 'book', to: '/directories' },
-  { name: 'Users', label: t('nav.users'), icon: 'user-group', to: '/users' },
-  { name: 'Audit', label: t('nav.audit'), icon: 'document', to: '/audit' },
-])
+const managementNavItems = computed(() => {
+  const items = []
+  if (canAccess('employees', ['admin', 'master'])) {
+    items.push({ name: 'Employees', label: t('nav.employees'), icon: 'users', to: '/employees' })
+  }
+  if (canAccess('sklad', ['admin', 'master'])) {
+    items.push({ name: 'Sklad', label: t('nav.sklad'), icon: 'cube', to: '/sklad' })
+  }
+  return items
+})
+
+const adminNavItems = computed(() => {
+  const items = []
+  if (canAccess('maintenance', ['admin'])) {
+    items.push({
+      name: 'Maintenance',
+      label: t('nav.maintenance'),
+      icon: 'wrench',
+      to: '/maintenance',
+      badge: maintenanceBadgeCount.value || undefined,
+      badgeColor: maintenanceAlerts.value.overdue_count > 0 ? 'rose' : 'amber',
+    })
+  }
+  if (canAccess('directories', ['admin'])) {
+    items.push({ name: 'Directories', label: t('nav.directories'), icon: 'book', to: '/directories' })
+  }
+  if (canAccess('users', ['admin'])) {
+    items.push({ name: 'Users', label: t('nav.users'), icon: 'user-group', to: '/users' })
+  }
+  if (canAccess('audit', ['admin'])) {
+    items.push({ name: 'Audit', label: t('nav.audit'), icon: 'document', to: '/audit' })
+  }
+  return items
+})
 </script>
+
+<style scoped>
+.notif-drop-enter-active { transition: opacity 0.15s, transform 0.15s; }
+.notif-drop-leave-active { transition: opacity 0.1s, transform 0.1s; }
+.notif-drop-enter-from  { opacity: 0; transform: translateY(-6px) scale(0.97); }
+.notif-drop-leave-to    { opacity: 0; transform: translateY(-4px) scale(0.98); }
+</style>

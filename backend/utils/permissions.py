@@ -41,6 +41,20 @@ class IsAdminOrMasterOrOwner(permissions.BasePermission):
         return request.user and request.user.is_authenticated
 
 
+def section_access(section_key):
+    """Permission class factory: allows admins OR users with the section in allowed_sections."""
+    class SectionAccess(permissions.BasePermission):
+        def has_permission(self, request, view):
+            if not (request.user and request.user.is_authenticated):
+                return False
+            if request.user.role == 'admin':
+                return True
+            allowed = getattr(request.user, 'allowed_sections', None)
+            return bool(allowed and section_key in allowed)
+    SectionAccess.__name__ = f'SectionAccess_{section_key}'
+    return SectionAccess
+
+
 # ============================================================
 # Pagination
 # ============================================================

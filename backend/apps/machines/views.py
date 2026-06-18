@@ -16,13 +16,14 @@ from openpyxl.utils import get_column_letter
 from utils.permissions import IsAdmin, IsAdminOrMaster, IsAdminOrMasterOrOwner
 from .models import (
     Machine, MachineType, MachineStatus,
-    MachineStatusHistory, MachineAttachment, MachineAssignment
+    MachineStatusHistory, MachineAttachment, MachineAssignment, MaintenanceSchedule
 )
 from .serializers import (
     MachineListSerializer, MachineDetailSerializer, MachineCreateUpdateSerializer,
     MachineTypeSerializer, MachineStatusSerializer, MachineStatusHistorySerializer,
     MachineAttachmentSerializer, MachineAttachmentCreateSerializer,
-    MachineAssignmentSerializer, ChangeStatusSerializer
+    MachineAssignmentSerializer, ChangeStatusSerializer,
+    MaintenanceScheduleSerializer, MaintenanceScheduleWriteSerializer, MaintenanceCompleteSerializer,
 )
 from .filters import MachineFilter
 from apps.audit.signals import log_action
@@ -96,7 +97,7 @@ class MachineViewSet(viewsets.ModelViewSet):
     ordering = ['inventory_number']
 
     def get_permissions(self):
-        if self.action in ['list', 'retrieve']:
+        if self.action in ['list', 'retrieve', 'period_stats', 'export_excel', 'import_template']:
             return [IsAdminOrMasterOrOwner()]
         if self.action in ['create', 'update', 'partial_update', 'assign_operator',
                           'change_status', 'upload_attachment']:
@@ -134,6 +135,10 @@ class MachineViewSet(viewsets.ModelViewSet):
     @extend_schema(summary='Мягкое удаление станка')
     def destroy(self, request, *args, **kwargs):
         machine = self.get_object()
+        try:
+            machine.maintenance_schedule.delete()
+        except MaintenanceSchedule.DoesNotExist:
+            pass
         machine.deleted_at = timezone.now()
         machine.deleted_by = request.user
         machine.save()
@@ -447,6 +452,8 @@ class MachineViewSet(viewsets.ModelViewSet):
         created = 0
         updated = 0
 
+        default_status = MachineStatus.objects.filter(color='green', is_active=True).first()
+
         try:
             wb = openpyxl.load_workbook(file)
             ws = wb.active
@@ -470,10 +477,23 @@ class MachineViewSet(viewsets.ModelViewSet):
                             'created_by': request.user,
                         }
                     )
+                    save_fields = []
                     if created_flag:
+                        if default_status:
+                            machine.current_status = default_status
+                            save_fields.append('current_status')
                         created += 1
                     else:
+                        if machine.deleted_at is not None:
+                            machine.deleted_at = None
+                            machine.deleted_by = None
+                            save_fields += ['deleted_at', 'deleted_by']
+                            if default_status and not machine.current_status:
+                                machine.current_status = default_status
+                                save_fields.append('current_status')
                         updated += 1
+                    if save_fields:
+                        machine.save(update_fields=save_fields)
                 except Exception as e:
                     errors.append({'row': row_num, 'error': str(e)})
 
@@ -508,3 +528,125 @@ class MachineViewSet(viewsets.ModelViewSet):
         )
         response['Content-Disposition'] = 'attachment; filename="machines_import_template.xlsx"'
         return response
+
+    @extend_schema(summary='Получить/создать/обновить график ТО станка')
+    @action(detail=True, methods=['get', 'post', 'patch', 'delete'], url_path='maintenance')
+    def maintenance(self, request, pk=None):
+        if request.method == 'DELETE':
+            if not request.user.role == 'admin':
+                return Response({'detail': 'Только администратор может удалить график ТО'},
+                                status=status.HTTP_403_FORBIDDEN)
+            try:
+                schedule = MaintenanceSchedule.objects.get(machine_id=pk)
+                schedule.delete()
+                return Response({'detail': 'График ТО удалён'})
+            except MaintenanceSchedule.DoesNotExist:
+                return Response({'detail': 'График ТО не найден'}, status=status.HTTP_404_NOT_FOUND)
+
+        machine = self.get_object()
+
+        if request.method == 'GET':
+            try:
+                schedule = machine.maintenance_schedule
+                return Response(MaintenanceScheduleSerializer(schedule).data)
+            except MaintenanceSchedule.DoesNotExist:
+                return Response(None)
+
+        if not request.user.role == 'admin':
+            return Response({'detail': 'Только администратор может задавать график ТО'},
+                            status=status.HTTP_403_FORBIDDEN)
+
+        serializer = MaintenanceScheduleWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        if request.method == 'POST':
+            if hasattr(machine, 'maintenance_schedule'):
+                return Response({'detail': 'График ТО уже существует. Используйте PATCH для обновления.'},
+                                status=status.HTTP_400_BAD_REQUEST)
+            schedule = MaintenanceSchedule.objects.create(
+                machine=machine,
+                created_by=request.user,
+                updated_by=request.user,
+                **serializer.validated_data,
+            )
+        else:
+            try:
+                schedule = machine.maintenance_schedule
+            except MaintenanceSchedule.DoesNotExist:
+                return Response({'detail': 'График ТО не найден'}, status=status.HTTP_404_NOT_FOUND)
+            for attr, value in serializer.validated_data.items():
+                setattr(schedule, attr, value)
+            schedule.updated_by = request.user
+            schedule.save()
+
+        return Response(
+            MaintenanceScheduleSerializer(schedule).data,
+            status=status.HTTP_201_CREATED if request.method == 'POST' else status.HTTP_200_OK,
+        )
+
+    @extend_schema(summary='Отметить ТО как выполненное', request=MaintenanceCompleteSerializer)
+    @action(detail=True, methods=['post'], url_path='maintenance/complete')
+    def maintenance_complete(self, request, pk=None):
+        if not request.user.role == 'admin':
+            return Response({'detail': 'Только администратор может отмечать выполнение ТО'},
+                            status=status.HTTP_403_FORBIDDEN)
+
+        machine = self.get_object()
+        try:
+            schedule = machine.maintenance_schedule
+        except MaintenanceSchedule.DoesNotExist:
+            return Response({'detail': 'График ТО не найден'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = MaintenanceCompleteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        from dateutil.relativedelta import relativedelta
+        completion_date = serializer.validated_data['completion_date']
+        schedule.last_maintenance_date = completion_date
+        schedule.next_maintenance_date = completion_date + relativedelta(months=schedule.interval_months)
+        if serializer.validated_data.get('notes'):
+            schedule.notes = serializer.validated_data['notes']
+        schedule.updated_by = request.user
+        schedule.save()
+
+        return Response(MaintenanceScheduleSerializer(schedule).data)
+
+
+@extend_schema(tags=['maintenance'])
+class MaintenanceAlertsView(generics.ListAPIView):
+    """
+    Возвращает все графики ТО.
+    Без параметров: только станки с истекающим/просроченным ТО (в течение 30 дней).
+    С параметром ?all=true: все графики ТО.
+    """
+    serializer_class = MaintenanceScheduleSerializer
+
+    def get_queryset(self):
+        from django.utils import timezone
+        import datetime
+        qs = MaintenanceSchedule.objects.filter(
+            machine__deleted_at__isnull=True,
+        ).select_related(
+            'machine', 'machine__workshop', 'created_by', 'updated_by'
+        ).order_by('next_maintenance_date')
+
+        if self.request.query_params.get('all') != 'true':
+            today = timezone.now().date()
+            warning_threshold = today + datetime.timedelta(days=30)
+            qs = qs.filter(next_maintenance_date__lte=warning_threshold)
+
+        return qs
+
+    def list(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+        data = MaintenanceScheduleSerializer(qs, many=True).data
+        overdue = [x for x in data if x['alert_level'] == 'overdue']
+        critical = [x for x in data if x['alert_level'] == 'critical']
+        warning = [x for x in data if x['alert_level'] == 'warning']
+        return Response({
+            'total': len(data),
+            'overdue_count': len(overdue),
+            'critical_count': len(critical),
+            'warning_count': len(warning),
+            'results': data,
+        })

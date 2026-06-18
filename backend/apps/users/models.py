@@ -43,6 +43,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     created_at = models.DateTimeField('Создан', auto_now_add=True)
     updated_at = models.DateTimeField('Обновлён', auto_now=True)
     last_activity = models.DateTimeField('Последняя активность', null=True, blank=True)
+    allowed_sections = models.JSONField('Доступные разделы', null=True, blank=True, default=None)
 
     objects = UserManager()
 

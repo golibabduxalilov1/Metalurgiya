@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema
 from django_filters import rest_framework as filters
 
-from utils.permissions import IsAdmin
+from utils.permissions import IsAdmin, section_access
 
 
 class AuditLog(models.Model):
@@ -85,7 +85,7 @@ class AuditLogListView(generics.ListAPIView):
     """Журнал действий (только для администраторов)"""
     queryset = AuditLog.objects.select_related('user').all()
     serializer_class = AuditLogSerializer
-    permission_classes = [IsAdmin]
+    permission_classes = [section_access('audit')]
     filterset_class = AuditLogFilter
     search_fields = ['object_repr', 'user__last_name', 'user__first_name']
     ordering_fields = ['created_at']

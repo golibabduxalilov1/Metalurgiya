@@ -264,3 +264,51 @@ class MachineAssignment(models.Model):
 
     def __str__(self):
         return f"{self.machine} ← {self.operator}"
+
+
+class MaintenanceSchedule(models.Model):
+    """График технического обслуживания (ТО) станка"""
+    machine = models.OneToOneField(
+        Machine, on_delete=models.CASCADE,
+        related_name='maintenance_schedule', verbose_name='Станок'
+    )
+    interval_months = models.PositiveIntegerField('Интервал ТО (месяцев)')
+    last_maintenance_date = models.DateField('Дата последнего ТО', null=True, blank=True)
+    next_maintenance_date = models.DateField('Дата следующего ТО')
+    notes = models.TextField('Примечания', blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        related_name='created_maintenance_schedules', null=True, blank=True
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        related_name='updated_maintenance_schedules', null=True, blank=True
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'maintenance_schedules'
+        verbose_name = 'График ТО'
+        verbose_name_plural = 'Графики ТО'
+        ordering = ['next_maintenance_date']
+
+    def __str__(self):
+        return f"ТО: {self.machine} → {self.next_maintenance_date}"
+
+    @property
+    def days_until(self):
+        from django.utils import timezone
+        delta = self.next_maintenance_date - timezone.now().date()
+        return delta.days
+
+    @property
+    def alert_level(self):
+        days = self.days_until
+        if days < 0:
+            return 'overdue'
+        if days <= 7:
+            return 'critical'
+        if days <= 30:
+            return 'warning'
+        return 'ok'

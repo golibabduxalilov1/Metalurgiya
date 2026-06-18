@@ -23,37 +23,63 @@ api.interceptors.request.use(
 )
 
 // Response interceptor - handle token refresh and errors
+let isRefreshing = false
+let failedQueue = []
+
+function processQueue(error, token = null) {
+  failedQueue.forEach(p => error ? p.reject(error) : p.resolve(token))
+  failedQueue = []
+}
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true
-
-      const refreshToken = localStorage.getItem('refresh_token')
-      if (refreshToken) {
-        try {
-          const response = await axios.post(`${originalRequest.baseURL || '/api/v1'}/auth/refresh/`, {
-            refresh: refreshToken
-          })
-          const { access } = response.data
-          localStorage.setItem('access_token', access)
-          api.defaults.headers.common['Authorization'] = `Bearer ${access}`
-          originalRequest.headers.Authorization = `Bearer ${access}`
-          return api(originalRequest)
-        } catch {
-          localStorage.removeItem('access_token')
-          localStorage.removeItem('refresh_token')
-          router.push('/login')
-          return Promise.reject(error)
-        }
-      } else {
-        router.push('/login')
-      }
+    if (error.response?.status !== 401 || originalRequest._retry) {
+      return Promise.reject(error)
     }
 
-    return Promise.reject(error)
+    // If a refresh is already in progress — queue this request
+    if (isRefreshing) {
+      return new Promise((resolve, reject) => {
+        failedQueue.push({ resolve, reject })
+      }).then(token => {
+        originalRequest.headers.Authorization = `Bearer ${token}`
+        return api(originalRequest)
+      }).catch(err => Promise.reject(err))
+    }
+
+    originalRequest._retry = true
+    isRefreshing = true
+
+    const refreshToken = localStorage.getItem('refresh_token')
+    if (!refreshToken) {
+      isRefreshing = false
+      processQueue(error)
+      router.push('/login')
+      return Promise.reject(error)
+    }
+
+    try {
+      const res = await axios.post(`${originalRequest.baseURL || '/api/v1'}/auth/refresh/`, {
+        refresh: refreshToken,
+      })
+      const { access } = res.data
+      localStorage.setItem('access_token', access)
+      api.defaults.headers.common['Authorization'] = `Bearer ${access}`
+      processQueue(null, access)
+      originalRequest.headers.Authorization = `Bearer ${access}`
+      return api(originalRequest)
+    } catch (err) {
+      processQueue(err)
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('refresh_token')
+      router.push('/login')
+      return Promise.reject(err)
+    } finally {
+      isRefreshing = false
+    }
   }
 )
 
@@ -139,4 +165,22 @@ export const employeesApi = {
 
 export const auditApi = {
   list: (params) => api.get('/audit/', { params }),
+}
+
+export const warehouseApi = {
+  list: (params) => api.get('/spare-parts/', { params }),
+  get: (id) => api.get(`/spare-parts/${id}/`),
+  create: (data) => api.post('/spare-parts/', data),
+  update: (id, data) => api.patch(`/spare-parts/${id}/`, data),
+  delete: (id) => api.delete(`/spare-parts/${id}/`),
+}
+
+export const maintenanceApi = {
+  alerts: () => api.get('/maintenance/alerts/'),
+  all: () => api.get('/maintenance/alerts/', { params: { all: 'true' } }),
+  get: (machineId) => api.get(`/machines/${machineId}/maintenance/`),
+  set: (machineId, data) => api.post(`/machines/${machineId}/maintenance/`, data),
+  update: (machineId, data) => api.patch(`/machines/${machineId}/maintenance/`, data),
+  delete: (machineId) => api.delete(`/machines/${machineId}/maintenance/`),
+  complete: (machineId, data) => api.post(`/machines/${machineId}/maintenance/complete/`, data),
 }

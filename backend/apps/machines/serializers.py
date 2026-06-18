@@ -6,7 +6,7 @@ from rest_framework import serializers
 
 from apps.workshops.models import Workshop, Section
 from apps.employees.models import Employee
-from .models import Machine, MachineType, MachineStatus, MachineStatusHistory, MachineAttachment, MachineAssignment
+from .models import Machine, MachineType, MachineStatus, MachineStatusHistory, MachineAttachment, MachineAssignment, MaintenanceSchedule
 
 
 class MachineTypeSerializer(serializers.ModelSerializer):
@@ -213,6 +213,67 @@ class MachineCreateUpdateSerializer(serializers.ModelSerializer):
             qs = qs.exclude(pk=self.instance.pk)
         if qs.exists():
             raise serializers.ValidationError('Станок с таким инвентарным номером уже существует')
+        return value
+
+
+class MaintenanceScheduleSerializer(serializers.ModelSerializer):
+    machine_name = serializers.CharField(source='machine.name', read_only=True)
+    machine_inventory = serializers.CharField(source='machine.inventory_number', read_only=True)
+    machine_workshop = serializers.CharField(source='machine.workshop.name', read_only=True)
+    days_until = serializers.SerializerMethodField()
+    alert_level = serializers.SerializerMethodField()
+    created_by_name = serializers.SerializerMethodField()
+    updated_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MaintenanceSchedule
+        fields = [
+            'id', 'machine', 'machine_name', 'machine_inventory', 'machine_workshop',
+            'interval_months', 'last_maintenance_date', 'next_maintenance_date',
+            'notes', 'days_until', 'alert_level',
+            'created_by', 'created_by_name', 'updated_by', 'updated_by_name',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = ['machine', 'created_by', 'updated_by', 'created_at', 'updated_at']
+
+    def get_days_until(self, obj):
+        return obj.days_until
+
+    def get_alert_level(self, obj):
+        return obj.alert_level
+
+    def get_created_by_name(self, obj):
+        return obj.created_by.get_full_name() if obj.created_by else None
+
+    def get_updated_by_name(self, obj):
+        return obj.updated_by.get_full_name() if obj.updated_by else None
+
+
+class MaintenanceScheduleWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MaintenanceSchedule
+        fields = ['interval_months', 'last_maintenance_date', 'notes']
+        extra_kwargs = {
+            'last_maintenance_date': {'required': True, 'allow_null': False},
+        }
+
+    def validate(self, attrs):
+        from dateutil.relativedelta import relativedelta
+        last_date = attrs.get('last_maintenance_date')
+        interval = attrs.get('interval_months')
+        if last_date and interval:
+            attrs['next_maintenance_date'] = last_date + relativedelta(months=interval)
+        return attrs
+
+
+class MaintenanceCompleteSerializer(serializers.Serializer):
+    completion_date = serializers.DateField()
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+    def validate_completion_date(self, value):
+        from django.utils import timezone
+        if value > timezone.now().date():
+            raise serializers.ValidationError('Дата завершения ТО не может быть в будущем')
         return value
 
 

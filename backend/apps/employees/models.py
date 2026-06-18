@@ -4,7 +4,7 @@ Employees App - Справочник сотрудников/операторов
 from django.db import models
 from rest_framework import serializers, viewsets
 from drf_spectacular.utils import extend_schema
-from utils.permissions import IsAdmin, IsAdminOrMaster
+from utils.permissions import IsAdmin, IsAdminOrMaster, section_access
 
 
 class Employee(models.Model):
@@ -71,5 +71,5 @@ class EmployeeViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
-            return [IsAdminOrMaster()]
+            return [section_access('employees')()]
         return [IsAdmin()]

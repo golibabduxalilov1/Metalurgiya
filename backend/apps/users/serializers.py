@@ -33,8 +33,9 @@ class UserListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'full_name', 'role', 'role_display',
-                  'phone', 'is_active', 'is_superuser', 'created_at', 'last_activity']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'patronymic',
+                  'full_name', 'role', 'role_display', 'phone', 'is_active', 'is_superuser',
+                  'created_at', 'last_activity', 'allowed_sections']
 
     def get_full_name(self, obj):
         return obj.get_full_name()
@@ -48,7 +49,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'username', 'email', 'first_name', 'last_name', 'patronymic',
                   'full_name', 'role', 'role_display', 'phone', 'is_active', 'is_superuser',
-                  'created_at', 'updated_at', 'last_activity']
+                  'created_at', 'updated_at', 'last_activity', 'allowed_sections']
 
     def get_full_name(self, obj):
         return obj.get_full_name()
@@ -61,7 +62,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['username', 'email', 'first_name', 'last_name', 'patronymic',
-                  'role', 'phone', 'password', 'password_confirm']
+                  'role', 'phone', 'password', 'password_confirm', 'allowed_sections']
 
     def validate(self, attrs):
         if attrs['password'] != attrs.pop('password_confirm'):
@@ -76,7 +77,7 @@ class UserUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['email', 'first_name', 'last_name', 'patronymic', 'phone',
-                  'role', 'is_active']
+                  'role', 'is_active', 'allowed_sections']
 
 
 class ChangePasswordSerializer(serializers.Serializer):
@@ -109,7 +110,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'first_name', 'last_name', 'patronymic',
-                  'full_name', 'role', 'role_display', 'phone', 'is_superuser', 'last_activity']
+                  'full_name', 'role', 'role_display', 'phone', 'is_superuser',
+                  'last_activity', 'allowed_sections']
 
     def get_full_name(self, obj):
         return obj.get_full_name()

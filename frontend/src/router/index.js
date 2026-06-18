@@ -27,53 +27,67 @@ const routes = [
         path: 'machines',
         name: 'Machines',
         component: () => import('@/views/machines/MachineListView.vue'),
-        meta: { title: 'Реестр станков', icon: 'cpu-chip' }
+        meta: { title: 'Реестр станков', icon: 'cpu-chip', section: 'machines' }
       },
       {
         path: 'machines/new',
         name: 'MachineCreate',
         component: () => import('@/views/machines/MachineFormView.vue'),
-        meta: { title: 'Добавить станок', roles: ['admin', 'master'] }
+        meta: { title: 'Добавить станок', roles: ['admin', 'master'], section: 'machines' }
       },
       {
         path: 'machines/:id',
         name: 'MachineDetail',
         component: () => import('@/views/machines/MachineDetailView.vue'),
-        meta: { title: 'Карточка станка' }
+        meta: { title: 'Карточка станка', section: 'machines' }
       },
       {
         path: 'machines/:id/edit',
         name: 'MachineEdit',
         component: () => import('@/views/machines/MachineFormView.vue'),
-        meta: { title: 'Редактировать станок', roles: ['admin', 'master'] }
+        meta: { title: 'Редактировать станок', roles: ['admin', 'master'], section: 'machines' }
       },
       // Employees
       {
         path: 'employees',
         name: 'Employees',
         component: () => import('@/views/EmployeesView.vue'),
-        meta: { title: 'Сотрудники', icon: 'users', roles: ['admin', 'master'] }
+        meta: { title: 'Сотрудники', icon: 'users', roles: ['admin', 'master'], section: 'employees' }
       },
       // Directories (Admin only)
       {
         path: 'directories',
         name: 'Directories',
         component: () => import('@/views/DirectoriesView.vue'),
-        meta: { title: 'Справочники', icon: 'book-open', roles: ['admin'] }
+        meta: { title: 'Справочники', icon: 'book-open', roles: ['admin'], section: 'directories' }
       },
       // Users
       {
         path: 'users',
         name: 'Users',
         component: () => import('@/views/UsersView.vue'),
-        meta: { title: 'Пользователи', icon: 'user-group', roles: ['admin'] }
+        meta: { title: 'Пользователи', icon: 'user-group', roles: ['admin'], section: 'users' }
       },
       // Audit log
       {
         path: 'audit',
         name: 'Audit',
         component: () => import('@/views/AuditView.vue'),
-        meta: { title: 'Журнал аудита', icon: 'document-text', roles: ['admin'] }
+        meta: { title: 'Журнал аудита', icon: 'document-text', roles: ['admin'], section: 'audit' }
+      },
+      // Warehouse (Склад)
+      {
+        path: 'sklad',
+        name: 'Sklad',
+        component: () => import('@/views/SkaldView.vue'),
+        meta: { title: 'Склад', icon: 'cube', section: 'sklad' }
+      },
+      // Maintenance (ТО)
+      {
+        path: 'maintenance',
+        name: 'Maintenance',
+        component: () => import('@/views/MaintenanceView.vue'),
+        meta: { title: 'Техническое обслуживание (ТО)', icon: 'wrench', roles: ['admin'], section: 'maintenance' }
       },
       // Profile
       {
@@ -123,9 +137,21 @@ router.beforeEach(async (to, from, next) => {
     return next({ name: 'Login', query: { redirect: to.fullPath } })
   }
 
-  // Role-based access
+  // Role-based access — bypassed if section is explicitly granted via allowed_sections
   if (to.meta.roles && !auth.hasRole(...to.meta.roles)) {
-    return next('/dashboard')
+    const explicitlyGranted = to.meta.section &&
+      auth.user?.allowed_sections?.includes(to.meta.section)
+    if (!explicitlyGranted) {
+      return next('/dashboard')
+    }
+  }
+
+  // Section-based access: when allowed_sections is set, restrict to listed sections only
+  if (to.meta.section) {
+    const sections = auth.user?.allowed_sections
+    if (sections && !sections.includes(to.meta.section)) {
+      return next('/dashboard')
+    }
   }
 
   next()
