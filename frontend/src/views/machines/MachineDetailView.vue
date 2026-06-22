@@ -305,6 +305,15 @@
                       d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                   </svg>
                 </a>
+                <button v-if="auth.canWrite" @click="confirmDeleteAttachment(att)"
+                  class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50
+                         transition-colors duration-150 opacity-0 group-hover:opacity-100"
+                  :title="t('common.delete')">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                  </svg>
+                </button>
               </div>
             </div>
           </div>
@@ -411,6 +420,14 @@
       @updated="onAssignUpdated"
       @close="showAssignModal = false" />
 
+    <!-- Delete Attachment confirm -->
+    <ConfirmModal v-if="deleteAttachmentTarget"
+      :title="t('machines.delete_file_title')"
+      :message="`«${deleteAttachmentTarget.original_filename}» ${t('machines.delete_file_msg')}`"
+      :confirm-label="t('common.delete')"
+      @confirm="doDeleteAttachment"
+      @cancel="deleteAttachmentTarget = null" />
+
   </div>
 </template>
 
@@ -424,6 +441,7 @@ import StatusBadge from '@/components/common/StatusBadge.vue'
 import InfoField from '@/components/common/InfoField.vue'
 import ChangeStatusModal from '@/components/machines/ChangeStatusModal.vue'
 import AssignOperatorModal from '@/components/machines/AssignOperatorModal.vue'
+import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import dayjs from 'dayjs'
 import { useI18n } from '@/i18n'
 
@@ -436,6 +454,7 @@ const machine = ref(null)
 const loading = ref(true)
 const showStatusModal = ref(false)
 const showAssignModal = ref(false)
+const deleteAttachmentTarget = ref(null)
 
 const colorMap = { green: 'working', yellow: 'idle', red: 'repair', gray: 'retired', blue: 'maintenance' }
 
@@ -462,6 +481,19 @@ async function loadMachine() {
     toast.error(t('toast.machine_not_found'))
   } finally {
     loading.value = false
+  }
+}
+
+function confirmDeleteAttachment(att) { deleteAttachmentTarget.value = att }
+
+async function doDeleteAttachment() {
+  try {
+    await machinesApi.deleteAttachment(deleteAttachmentTarget.value.id)
+    toast.success(t('toast.file_deleted'))
+    deleteAttachmentTarget.value = null
+    loadMachine()
+  } catch {
+    toast.error(t('toast.delete_error'))
   }
 }
 

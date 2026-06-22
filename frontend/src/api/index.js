@@ -128,6 +128,7 @@ export const machinesApi = {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
   importTemplate: () => api.get('/machines/import-template/', { responseType: 'blob' }),
+  deleteAttachment: (attachmentId) => api.delete(`/attachments/${attachmentId}/`),
 }
 
 export const machineTypesApi = {
