@@ -16,7 +16,8 @@ from openpyxl.utils import get_column_letter
 from utils.permissions import IsAdmin, IsAdminOrMaster, IsAdminOrMasterOrOwner
 from .models import (
     Machine, MachineType, MachineStatus,
-    MachineStatusHistory, MachineAttachment, MachineAssignment, MaintenanceSchedule
+    MachineStatusHistory, MachineAttachment, MachineAssignment,
+    MaintenanceSchedule, RepairTask, TaskSparePart, MaintenanceHistory
 )
 from .serializers import (
     MachineListSerializer, MachineDetailSerializer, MachineCreateUpdateSerializer,
@@ -24,6 +25,7 @@ from .serializers import (
     MachineAttachmentSerializer, MachineAttachmentCreateSerializer,
     MachineAssignmentSerializer, ChangeStatusSerializer,
     MaintenanceScheduleSerializer, MaintenanceScheduleWriteSerializer, MaintenanceCompleteSerializer,
+    RepairTaskSerializer, TaskSparePartSerializer, MaintenanceHistorySerializer,
 )
 from .filters import MachineFilter
 from apps.audit.signals import log_action
@@ -97,7 +99,13 @@ class MachineViewSet(viewsets.ModelViewSet):
     ordering = ['inventory_number']
 
     def get_permissions(self):
-        if self.action in ['list', 'retrieve', 'period_stats', 'export_excel', 'import_template']:
+        # Read-only actions — any authenticated user
+        if self.action in [
+            'list', 'retrieve', 'period_stats', 'export_excel', 'import_template',
+            'status_history', 'maintenance', 'maintenance_tasks',
+            'maintenance_task_detail', 'maintenance_task_spare_parts',
+            'maintenance_task_spare_part_delete', 'maintenance_history',
+        ]:
             return [IsAdminOrMasterOrOwner()]
         if self.action in ['create', 'update', 'partial_update', 'assign_operator',
                           'change_status', 'upload_attachment']:
@@ -139,6 +147,7 @@ class MachineViewSet(viewsets.ModelViewSet):
             machine.maintenance_schedule.delete()
         except MaintenanceSchedule.DoesNotExist:
             pass
+        MaintenanceHistory.objects.filter(machine=machine).delete()
         machine.deleted_at = timezone.now()
         machine.deleted_by = request.user
         machine.save()
@@ -547,7 +556,7 @@ class MachineViewSet(viewsets.ModelViewSet):
 
         if request.method == 'GET':
             try:
-                schedule = machine.maintenance_schedule
+                schedule = MaintenanceSchedule.objects.prefetch_related('tasks').get(machine=machine)
                 return Response(MaintenanceScheduleSerializer(schedule).data)
             except MaintenanceSchedule.DoesNotExist:
                 return Response(None)
@@ -584,6 +593,243 @@ class MachineViewSet(viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED if request.method == 'POST' else status.HTTP_200_OK,
         )
 
+    @extend_schema(summary='История ТО станка')
+    @action(detail=True, methods=['get'], url_path='maintenance-history')
+    def maintenance_history(self, request, pk=None):
+        machine = self.get_object()
+        history = MaintenanceHistory.objects.filter(machine=machine).select_related('completed_by')
+        return Response(MaintenanceHistorySerializer(history, many=True).data)
+
+    @extend_schema(summary='Начать ремонт станка')
+    @action(detail=True, methods=['post'], url_path='maintenance/start-repair')
+    def maintenance_start_repair(self, request, pk=None):
+        if not request.user.role == 'admin':
+            return Response({'detail': 'Только администратор может начать ремонт'},
+                            status=status.HTTP_403_FORBIDDEN)
+        machine = self.get_object()
+        try:
+            schedule = machine.maintenance_schedule
+        except MaintenanceSchedule.DoesNotExist:
+            return Response({'detail': 'График ТО не найден'}, status=status.HTTP_404_NOT_FOUND)
+        from django.utils import timezone
+        schedule.repair_started_at = timezone.now()
+        schedule.save(update_fields=['repair_started_at'])
+        return Response(MaintenanceScheduleSerializer(schedule).data)
+
+    @extend_schema(summary='Список/создание задач ремонта')
+    @action(detail=True, methods=['get', 'post'], url_path='maintenance/tasks')
+    def maintenance_tasks(self, request, pk=None):
+        machine = self.get_object()
+        try:
+            schedule = machine.maintenance_schedule
+        except MaintenanceSchedule.DoesNotExist:
+            return Response({'detail': 'График ТО не найден'}, status=status.HTTP_404_NOT_FOUND)
+
+        if request.method == 'GET':
+            tasks = schedule.tasks.select_related('assignee').prefetch_related(
+                'spare_parts_used__spare_part__unit'
+            ).all()
+            # Non-admin: show only tasks assigned to them (now direct User FK)
+            if request.user.role != 'admin':
+                tasks = tasks.filter(assignee=request.user)
+            return Response(RepairTaskSerializer(tasks, many=True, context={'request': request}).data)
+
+        if not request.user.role == 'admin':
+            return Response({'detail': 'Faqat administrator vazifa qo\'sha oladi'},
+                            status=status.HTTP_403_FORBIDDEN)
+        serializer = RepairTaskSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        task = RepairTask.objects.create(
+            schedule=schedule,
+            title=serializer.validated_data['title'],
+            assignee=serializer.validated_data.get('assignee'),
+            due_date=serializer.validated_data.get('due_date'),
+        )
+        return Response(RepairTaskSerializer(task, context={'request': request}).data,
+                        status=status.HTTP_201_CREATED)
+
+    @extend_schema(summary='Обновить/удалить задачу ремонта')
+    @action(detail=True, methods=['patch', 'delete'],
+            url_path=r'maintenance/tasks/(?P<task_pk>[^/.]+)')
+    def maintenance_task_detail(self, request, pk=None, task_pk=None):
+        machine = self.get_object()
+        try:
+            task = RepairTask.objects.get(pk=task_pk, schedule__machine=machine)
+        except RepairTask.DoesNotExist:
+            return Response({'detail': 'Задача не найдена'}, status=status.HTTP_404_NOT_FOUND)
+
+        is_admin = request.user.role == 'admin'
+
+        if request.method == 'DELETE':
+            if not is_admin and task.assignee_id != request.user.id:
+                return Response({'detail': 'Faqat administrator yoki biriktirilgan foydalanuvchi o\'chira oladi'},
+                                status=status.HTTP_403_FORBIDDEN)
+            task.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        # For PATCH: admin always allowed; non-admin only for is_done toggle on their own task
+        is_done_only = list(request.data.keys()) == ['is_done']
+        if not is_admin:
+            if not is_done_only:
+                return Response({'detail': 'Faqat administrator vazifani o\'zgartira oladi'},
+                                status=status.HTTP_403_FORBIDDEN)
+            # Check assignee matches current user (direct User FK comparison)
+            if task.assignee_id != request.user.id:
+                return Response(
+                    {'detail': 'Bu vazifa sizga biriktirilmagan'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+        from django.utils import timezone
+        from django.db import transaction
+        from collections import defaultdict
+        from decimal import Decimal
+        from apps.warehouse.models import SparePart
+        from apps.machines.models import TaskSparePart as TSP
+        import logging
+        logger = logging.getLogger(__name__)
+
+        is_done = request.data.get('is_done')
+        if is_done is not None:
+            was_done = task.is_done
+            marking_done = bool(is_done) and not was_done
+            insufficient_error = None
+
+            with transaction.atomic():
+                task.is_done = bool(is_done)
+                task.done_at = timezone.now() if task.is_done else None
+                task.save(update_fields=['is_done', 'done_at'])
+
+                if marking_done:
+                    usages = list(
+                        task.spare_parts_used.filter(deducted=False)
+                        .values('id', 'spare_part_id', 'quantity_used')
+                    )
+                    totals = defaultdict(Decimal)
+                    usages_by_sp = defaultdict(list)
+                    for u in usages:
+                        totals[u['spare_part_id']] += u['quantity_used']
+                        usages_by_sp[u['spare_part_id']].append((u['id'], u['quantity_used']))
+
+                    # PASS 1: Lock + validate (select_for_update works inside atomic)
+                    insufficient = []
+                    sp_cache = {}
+                    for sp_id, total_qty in totals.items():
+                        sp = SparePart.objects.select_for_update().get(pk=sp_id)
+                        sp_cache[sp_id] = sp
+                        if sp.quantity is not None and sp.quantity < total_qty:
+                            insufficient.append(
+                                f'Omborda "{sp.name}" yetarli emas: '
+                                f'kerak {total_qty}, mavjud {sp.quantity}'
+                            )
+
+                    if insufficient:
+                        insufficient_error = ' | '.join(insufficient)
+                        transaction.set_rollback(True)
+                    else:
+                        # PASS 2: Deduct — only when all validations passed
+                        for sp_id, total_qty in totals.items():
+                            sp = sp_cache[sp_id]
+                            fixed_unit_price = sp.unit_price
+                            logger.info('[DEDUCT] %s: before=%s, deduct=%s, unit_price=%s',
+                                        sp.name, sp.quantity, total_qty, fixed_unit_price)
+                            if sp.quantity is not None:
+                                sp.quantity -= total_qty
+                                sp.save(update_fields=['quantity', 'updated_at'])
+                                logger.info('[DEDUCT] %s: after=%s', sp.name, sp.quantity)
+                            for uid, uqty in usages_by_sp[sp_id]:
+                                cost = (uqty * fixed_unit_price) if fixed_unit_price is not None else None
+                                TSP.objects.filter(pk=uid).update(deducted=True, cost=cost)
+
+                elif not task.is_done and was_done:
+                    restore_usages = list(
+                        task.spare_parts_used.filter(deducted=True)
+                        .values('id', 'spare_part_id', 'quantity_used')
+                    )
+                    restore_totals = defaultdict(Decimal)
+                    restore_ids = defaultdict(list)
+                    for u in restore_usages:
+                        restore_totals[u['spare_part_id']] += u['quantity_used']
+                        restore_ids[u['spare_part_id']].append(u['id'])
+                    for sp_id, total_qty in restore_totals.items():
+                        sp = SparePart.objects.select_for_update().get(pk=sp_id)
+                        if sp.quantity is not None:
+                            sp.quantity += total_qty
+                            sp.save(update_fields=['quantity', 'updated_at'])
+                        TSP.objects.filter(id__in=restore_ids[sp_id]).update(deducted=False)
+
+            if insufficient_error:
+                return Response({'detail': insufficient_error}, status=status.HTTP_400_BAD_REQUEST)
+
+        task.refresh_from_db()
+        return Response(RepairTaskSerializer(task, context={'request': request}).data)
+
+    @extend_schema(summary='Список/добавление ehtiyot qism для задачи')
+    @action(detail=True, methods=['get', 'post'],
+            url_path=r'maintenance/tasks/(?P<task_pk>[^/.]+)/spare-parts')
+    def maintenance_task_spare_parts(self, request, pk=None, task_pk=None):
+        machine = self.get_object()
+        try:
+            task = RepairTask.objects.get(pk=task_pk, schedule__machine=machine)
+        except RepairTask.DoesNotExist:
+            return Response({'detail': 'Vazifa topilmadi'}, status=status.HTTP_404_NOT_FOUND)
+
+        if request.method == 'GET':
+            usages = task.spare_parts_used.select_related('spare_part__unit').all()
+            return Response(TaskSparePartSerializer(usages, many=True).data)
+
+        # Allow admin OR the task assignee
+        is_admin = request.user.role == 'admin'
+        is_assignee = task.assignee_id == request.user.id
+        if not is_admin and not is_assignee:
+            return Response(
+                {'detail': 'Faqat administrator yoki vazifaga biriktirilgan foydalanuvchi qo\'sha oladi'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        spare_part_id = request.data.get('spare_part')
+        quantity_used = request.data.get('quantity_used')
+        if not spare_part_id or not quantity_used:
+            return Response({'detail': 'spare_part va quantity_used majburiy'}, status=status.HTTP_400_BAD_REQUEST)
+
+        from apps.warehouse.models import SparePart
+        try:
+            sp = SparePart.objects.select_related('unit').get(pk=spare_part_id)
+        except SparePart.DoesNotExist:
+            return Response({'detail': 'Ehtiyot qism topilmadi'}, status=status.HTTP_404_NOT_FOUND)
+
+        from decimal import Decimal, InvalidOperation
+        try:
+            qty = Decimal(str(quantity_used))
+        except InvalidOperation:
+            return Response({'detail': 'Noto\'g\'ri miqdor'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if sp.quantity is not None and qty > sp.quantity:
+            return Response(
+                {'detail': f'Yetarli miqdor yo\'q. Mavjud: {sp.quantity}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        notes = request.data.get('notes', '')
+        usage = TaskSparePart.objects.create(task=task, spare_part=sp, quantity_used=qty, notes=notes)
+        return Response(TaskSparePartSerializer(usage).data, status=status.HTTP_201_CREATED)
+
+    @extend_schema(summary='Удалить ehtiyot qism из задачи')
+    @action(detail=True, methods=['delete'],
+            url_path=r'maintenance/tasks/(?P<task_pk>[^/.]+)/spare-parts/(?P<usage_pk>[^/.]+)')
+    def maintenance_task_spare_part_delete(self, request, pk=None, task_pk=None, usage_pk=None):
+        machine = self.get_object()
+        try:
+            usage = TaskSparePart.objects.get(pk=usage_pk, task__schedule__machine=machine)
+        except TaskSparePart.DoesNotExist:
+            return Response({'detail': 'Topilmadi'}, status=status.HTTP_404_NOT_FOUND)
+        is_admin = request.user.role == 'admin'
+        is_assignee = usage.task.assignee_id == request.user.id
+        if not is_admin and not is_assignee:
+            return Response({'detail': 'Nет доступа'}, status=status.HTTP_403_FORBIDDEN)
+        usage.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
     @extend_schema(summary='Отметить ТО как выполненное', request=MaintenanceCompleteSerializer)
     @action(detail=True, methods=['post'], url_path='maintenance/complete')
     def maintenance_complete(self, request, pk=None):
@@ -600,12 +846,79 @@ class MachineViewSet(viewsets.ModelViewSet):
         serializer = MaintenanceCompleteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        # ── Pre-check: validate all undone-task spare parts before completing ──
+        from collections import defaultdict
+        from decimal import Decimal as D
+        from apps.warehouse.models import SparePart as SP
+
+        pending_totals = defaultdict(D)
+        for task in schedule.tasks.prefetch_related('spare_parts_used').all():
+            if not task.is_done:
+                for u in task.spare_parts_used.filter(deducted=False).values('spare_part_id', 'quantity_used'):
+                    pending_totals[u['spare_part_id']] += u['quantity_used']
+
+        insufficient = []
+        for sp_id, qty in pending_totals.items():
+            sp = SP.objects.get(pk=sp_id)
+            if sp.quantity is not None and sp.quantity < qty:
+                insufficient.append(
+                    f'Omborda "{sp.name}" yetarli emas: kerak {qty}, mavjud {sp.quantity}'
+                )
+        if insufficient:
+            return Response(
+                {'detail': ' | '.join(insufficient)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         from dateutil.relativedelta import relativedelta
+
+        # Build tasks snapshot + calculate total_cost
+        from decimal import Decimal as D
+        tasks_snapshot = []
+        total_cost = D('0')
+        for task in schedule.tasks.prefetch_related('spare_parts_used__spare_part__unit').all():
+            spare_parts = []
+            task_cost = D('0')
+            for usage in task.spare_parts_used.all():
+                sp = usage.spare_part
+                unit_str = sp.unit.short_name or sp.unit.name if sp.unit else ''
+                cost = usage.cost or D('0')
+                task_cost += cost
+                spare_parts.append({
+                    'name': sp.name,
+                    'quantity_used': str(usage.quantity_used),
+                    'unit': unit_str,
+                    'unit_price': str(sp.unit_price) if sp.unit_price is not None else None,
+                    'cost': str(cost),
+                })
+            total_cost += task_cost
+            tasks_snapshot.append({
+                'title': task.title,
+                'assignee_name': task.assignee.get_full_name() if task.assignee else None,
+                'due_date': task.due_date.isoformat() if task.due_date else None,
+                'is_done': task.is_done,
+                'spare_parts': spare_parts,
+                'task_cost': str(task_cost),
+            })
+
+        # Create history record
+        completion_note = serializer.validated_data.get('notes', '')
+        MaintenanceHistory.objects.create(
+            machine=machine,
+            completed_by=request.user,
+            interval_months=schedule.interval_months,
+            notes=completion_note,
+            tasks_snapshot=tasks_snapshot,
+            repair_started_at=schedule.repair_started_at,
+            total_cost=total_cost,
+        )
+
         completion_date = serializer.validated_data['completion_date']
         schedule.last_maintenance_date = completion_date
         schedule.next_maintenance_date = completion_date + relativedelta(months=schedule.interval_months)
-        if serializer.validated_data.get('notes'):
-            schedule.notes = serializer.validated_data['notes']
+        if completion_note:
+            schedule.notes = completion_note
+        schedule.repair_started_at = None
         schedule.updated_by = request.user
         schedule.save()
 
@@ -628,7 +941,7 @@ class MaintenanceAlertsView(generics.ListAPIView):
             machine__deleted_at__isnull=True,
         ).select_related(
             'machine', 'machine__workshop', 'created_by', 'updated_by'
-        ).order_by('next_maintenance_date')
+        ).prefetch_related('tasks').order_by('next_maintenance_date')
 
         if self.request.query_params.get('all') != 'true':
             today = timezone.now().date()

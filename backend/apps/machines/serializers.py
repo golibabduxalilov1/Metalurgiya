@@ -6,7 +6,7 @@ from rest_framework import serializers
 
 from apps.workshops.models import Workshop, Section
 from apps.employees.models import Employee
-from .models import Machine, MachineType, MachineStatus, MachineStatusHistory, MachineAttachment, MachineAssignment, MaintenanceSchedule
+from .models import Machine, MachineType, MachineStatus, MachineStatusHistory, MachineAttachment, MachineAssignment, MaintenanceSchedule, RepairTask, TaskSparePart, MaintenanceHistory
 
 
 class MachineTypeSerializer(serializers.ModelSerializer):
@@ -216,6 +216,62 @@ class MachineCreateUpdateSerializer(serializers.ModelSerializer):
         return value
 
 
+class TaskSparePartSerializer(serializers.ModelSerializer):
+    spare_part_name = serializers.CharField(source='spare_part.name', read_only=True)
+    unit_short = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TaskSparePart
+        fields = ['id', 'task', 'spare_part', 'spare_part_name', 'unit_short',
+                  'quantity_used', 'notes', 'cost', 'deducted', 'created_at']
+        read_only_fields = ['task', 'deducted', 'created_at']
+
+    def get_unit_short(self, obj):
+        if obj.spare_part.unit:
+            return obj.spare_part.unit.short_name or obj.spare_part.unit.name
+        return None
+
+
+class RepairTaskSerializer(serializers.ModelSerializer):
+    assignee_name = serializers.SerializerMethodField()
+    spare_parts_used = TaskSparePartSerializer(many=True, read_only=True)
+    is_mine = serializers.SerializerMethodField()
+
+    class Meta:
+        model = RepairTask
+        fields = ['id', 'schedule', 'title', 'assignee', 'assignee_name', 'due_date',
+                  'is_done', 'done_at', 'created_at', 'spare_parts_used', 'is_mine']
+        read_only_fields = ['schedule', 'done_at', 'created_at']
+
+    def get_assignee_name(self, obj):
+        if not obj.assignee:
+            return None
+        return f"{obj.assignee.get_full_name()} — {obj.assignee.get_role_display()}"
+
+    def get_is_mine(self, obj):
+        request = self.context.get('request')
+        if not request:
+            return False
+        if request.user.role == 'admin':
+            return True
+        return obj.assignee_id == request.user.id
+
+
+class MaintenanceHistorySerializer(serializers.ModelSerializer):
+    completed_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MaintenanceHistory
+        fields = ['id', 'machine', 'repair_started_at', 'completed_at', 'completed_by',
+                  'completed_by_name', 'interval_months', 'notes', 'tasks_snapshot', 'total_cost']
+        read_only_fields = ['__all__']
+
+    def get_completed_by_name(self, obj):
+        if obj.completed_by:
+            return obj.completed_by.get_full_name() or obj.completed_by.username
+        return None
+
+
 class MaintenanceScheduleSerializer(serializers.ModelSerializer):
     machine_name = serializers.CharField(source='machine.name', read_only=True)
     machine_inventory = serializers.CharField(source='machine.inventory_number', read_only=True)
@@ -230,7 +286,8 @@ class MaintenanceScheduleSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'machine', 'machine_name', 'machine_inventory', 'machine_workshop',
             'interval_months', 'last_maintenance_date', 'next_maintenance_date',
-            'notes', 'days_until', 'alert_level',
+            'notes', 'days_until', 'alert_level', 'in_repair', 'repair_started_at',
+            'tasks_total', 'tasks_done', 'total_expense',
             'created_by', 'created_by_name', 'updated_by', 'updated_by_name',
             'created_at', 'updated_at',
         ]
@@ -242,6 +299,28 @@ class MaintenanceScheduleSerializer(serializers.ModelSerializer):
     def get_alert_level(self, obj):
         return obj.alert_level
 
+    def get_in_repair(self, obj):
+        return obj.in_repair
+
+    def get_tasks_total(self, obj):
+        return obj.tasks_total
+
+    def get_tasks_done(self, obj):
+        return obj.tasks_done
+
+    def get_total_expense(self, obj):
+        from django.db.models import Sum
+        from apps.machines.models import MaintenanceHistory
+        result = MaintenanceHistory.objects.filter(machine=obj.machine).aggregate(
+            total=Sum('total_cost')
+        )
+        return str(result['total'] or 0)
+
+    in_repair = serializers.SerializerMethodField()
+    tasks_total = serializers.SerializerMethodField()
+    tasks_done = serializers.SerializerMethodField()
+    total_expense = serializers.SerializerMethodField()
+
     def get_created_by_name(self, obj):
         return obj.created_by.get_full_name() if obj.created_by else None
 
@@ -250,19 +329,30 @@ class MaintenanceScheduleSerializer(serializers.ModelSerializer):
 
 
 class MaintenanceScheduleWriteSerializer(serializers.ModelSerializer):
+    next_maintenance_date = serializers.DateField(required=False, write_only=True)
+
     class Meta:
         model = MaintenanceSchedule
-        fields = ['interval_months', 'last_maintenance_date', 'notes']
+        fields = ['interval_months', 'last_maintenance_date', 'next_maintenance_date', 'notes']
         extra_kwargs = {
-            'last_maintenance_date': {'required': True, 'allow_null': False},
+            'last_maintenance_date': {'required': False, 'allow_null': True},
         }
 
     def validate(self, attrs):
         from dateutil.relativedelta import relativedelta
+        next_date = attrs.pop('next_maintenance_date', None)
         last_date = attrs.get('last_maintenance_date')
         interval = attrs.get('interval_months')
-        if last_date and interval:
+        if next_date and interval:
+            # Direct next date provided — calculate last_maintenance_date backwards
+            attrs['next_maintenance_date'] = next_date
+            if not last_date:
+                attrs['last_maintenance_date'] = next_date - relativedelta(months=interval)
+        elif last_date and interval:
             attrs['next_maintenance_date'] = last_date + relativedelta(months=interval)
+        else:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError('next_maintenance_date yoki last_maintenance_date talab qilinadi')
         return attrs
 
 

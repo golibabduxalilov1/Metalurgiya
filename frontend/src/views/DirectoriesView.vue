@@ -61,6 +61,55 @@
       />
     </div>
 
+    <!-- Units tab -->
+    <div v-if="activeTab === 'units'">
+      <div class="card overflow-hidden">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <div class="flex items-center gap-3">
+            <div class="w-7 h-7 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
+              <svg class="w-3.5 h-3.5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/>
+              </svg>
+            </div>
+            <h3 class="text-sm font-semibold text-slate-700">{{ t('directories.panel_units') }}</h3>
+          </div>
+          <button @click="openAdd('unit')" class="btn-sm btn-primary">{{ t('directories.add_btn') }}</button>
+        </div>
+        <div v-if="loadingUnits" class="p-4 space-y-2">
+          <div v-for="i in 4" :key="i" class="skeleton h-11 rounded-lg"
+            :style="{ animationDelay: `${(i-1)*50}ms` }"></div>
+        </div>
+        <div v-else-if="units.length === 0" class="p-8 text-center text-sm text-slate-400">
+          {{ t('directories.empty_list') }}
+        </div>
+        <div v-else class="divide-y divide-slate-100">
+          <div v-for="u in units" :key="u.id"
+            class="flex items-center gap-3 px-5 py-3">
+            <span class="flex-1 text-sm font-medium text-slate-800">{{ u.name }}</span>
+            <span v-if="u.short_name"
+              class="text-xs bg-indigo-50 text-indigo-600 border border-indigo-100 font-semibold px-2 py-0.5 rounded-full">
+              {{ u.short_name }}
+            </span>
+            <button @click="openEdit('unit', u)"
+              class="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+              </svg>
+            </button>
+            <button @click="openDelete('unit', u)"
+              class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Statuses tab -->
     <div v-if="activeTab === 'statuses'">
       <div class="card overflow-hidden">
@@ -134,8 +183,9 @@
           </div>
           <div class="modal-body space-y-4">
             <div>
-              <label class="form-label">{{ t('directories.form_name') }}</label>
-              <input v-model="form.name" type="text" class="form-input" :placeholder="t('directories.form_name_ph')" />
+              <label class="form-label">{{ modalType === 'unit' ? t('directories.form_unit_name') : t('directories.form_name') }}</label>
+              <input v-model="form.name" type="text" class="form-input"
+                :placeholder="modalType === 'unit' ? t('directories.form_unit_name_ph') : t('directories.form_name_ph')" />
             </div>
             <!-- Section: workshop select -->
             <div v-if="modalType === 'section'">
@@ -171,8 +221,14 @@
                 <span class="text-sm text-slate-700">{{ t('directories.form_requires_comment') }}</span>
               </label>
             </template>
+            <!-- Unit short name -->
+            <div v-if="modalType === 'unit'">
+              <label class="form-label">{{ t('directories.form_unit_short') }}</label>
+              <input v-model="form.short_name" type="text" class="form-input"
+                :placeholder="t('directories.form_unit_short_ph')" />
+            </div>
             <!-- Description -->
-            <div v-if="modalType !== 'status'">
+            <div v-if="modalType !== 'status' && modalType !== 'unit'">
               <label class="form-label">{{ t('directories.form_desc') }}</label>
               <textarea v-model="form.description" class="form-textarea" rows="2"
                 :placeholder="t('directories.form_desc_ph')"></textarea>
@@ -206,7 +262,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useToast } from 'vue-toastification'
-import { workshopsApi, machineTypesApi, statusesApi } from '@/api'
+import { workshopsApi, machineTypesApi, statusesApi, unitsApi } from '@/api'
 import DirectoryPanel from '@/components/common/DirectoryPanel.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import { useI18n } from '@/i18n'
@@ -218,22 +274,25 @@ const tabs = computed(() => [
   { id: 'workshops', label: t('directories.tab_workshops') },
   { id: 'types', label: t('directories.tab_types') },
   { id: 'statuses', label: t('directories.tab_statuses') },
+  { id: 'units', label: t('directories.tab_units') },
 ])
 
 const workshops = ref([])
 const sections = ref([])
 const machineTypes = ref([])
 const statuses = ref([])
+const units = ref([])
 const loadingWs = ref(false)
 const loadingTypes = ref(false)
 const loadingStatuses = ref(false)
+const loadingUnits = ref(false)
 
 const showModal = ref(false)
 const saving = ref(false)
 const editTarget = ref(null)
 const modalType = ref('')
 const deleteTarget = ref(null)
-const form = reactive({ name: '', description: '', workshop: '', color: 'gray', requires_comment: false })
+const form = reactive({ name: '', description: '', workshop: '', color: 'gray', requires_comment: false, short_name: '' })
 
 const canSave = computed(() => {
   if (!form.name.trim()) return false
@@ -244,8 +303,8 @@ const canSave = computed(() => {
 const colorStyles = { green: '#10B981', yellow: '#F59E0B', red: '#EF4444', gray: '#6B7280', blue: '#3B82F6' }
 function getColorStyle(c) { return `background-color: ${colorStyles[c]}` }
 
-function openAdd(type) { modalType.value = type; editTarget.value = null; Object.assign(form, { name: '', description: '', workshop: '', color: 'gray', requires_comment: false }); showModal.value = true }
-function openEdit(type, item) { modalType.value = type; editTarget.value = item; Object.assign(form, item); showModal.value = true }
+function openAdd(type) { modalType.value = type; editTarget.value = null; Object.assign(form, { name: '', description: '', workshop: '', color: 'gray', requires_comment: false, short_name: '' }); showModal.value = true }
+function openEdit(type, item) { modalType.value = type; editTarget.value = item; Object.assign(form, { short_name: '', ...item }); showModal.value = true }
 function openDelete(type, item) { deleteTarget.value = { type, item } }
 
 async function doDelete() {
@@ -255,6 +314,7 @@ async function doDelete() {
     else if (type === 'section') await workshopsApi.deleteSection(item.id)
     else if (type === 'type') await machineTypesApi.delete(item.id)
     else if (type === 'status') await statusesApi.delete(item.id)
+    else if (type === 'unit') await unitsApi.delete(item.id)
     toast.success(t('toast.delete_success'))
     deleteTarget.value = null
     loadAll()
@@ -271,12 +331,14 @@ async function handleSave() {
       section:  { name: form.name, description: form.description, workshop: form.workshop },
       type:     { name: form.name, description: form.description },
       status:   { name: form.name, color: form.color, requires_comment: form.requires_comment },
+      unit:     { name: form.name, short_name: form.short_name },
     }
     const apiMap = {
       workshop: workshopsApi,
       section:  { create: d => workshopsApi.createSection(d), update: (id, d) => workshopsApi.updateSection(id, d) },
       type:     machineTypesApi,
       status:   statusesApi,
+      unit:     unitsApi,
     }
     const api = apiMap[modalType.value]
     const payload = payloadMap[modalType.value]
@@ -309,6 +371,11 @@ async function loadAll() {
   const stRes = await statusesApi.list()
   statuses.value = stRes.data.results || stRes.data
   loadingStatuses.value = false
+
+  loadingUnits.value = true
+  const uRes = await unitsApi.list({ page_size: 200 })
+  units.value = uRes.data.results || uRes.data
+  loadingUnits.value = false
 }
 
 onMounted(loadAll)

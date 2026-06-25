@@ -23,6 +23,7 @@ api_v1_urlpatterns = [
     path('audit/', include('apps.audit.urls')),
     path('maintenance/', include('apps.machines.urls.maintenance')),
     path('spare-parts/', include('apps.warehouse.urls')),
+    path('dashboard/', __import__('apps.machines.dashboard', fromlist=['DashboardView']).DashboardView.as_view(), name='dashboard'),
 ]
 
 urlpatterns = [

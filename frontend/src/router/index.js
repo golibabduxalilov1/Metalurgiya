@@ -89,6 +89,12 @@ const routes = [
         component: () => import('@/views/MaintenanceView.vue'),
         meta: { title: 'Техническое обслуживание (ТО)', icon: 'wrench', roles: ['admin'], section: 'maintenance' }
       },
+      {
+        path: 'maintenance/:machineId',
+        name: 'MaintenanceDetail',
+        component: () => import('@/views/MaintenanceDetailView.vue'),
+        meta: { title: 'TO jadvali', roles: ['admin'], section: 'maintenance' }
+      },
       // Profile
       {
         path: 'profile',

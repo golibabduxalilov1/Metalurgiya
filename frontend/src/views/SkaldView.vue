@@ -68,8 +68,9 @@
           <thead class="bg-slate-50 border-b border-slate-100">
             <tr>
               <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{{ t('sklad.col_name') }}</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden sm:table-cell">{{ t('sklad.col_quantity') }}</th>
               <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden sm:table-cell">{{ t('sklad.col_supplier') }}</th>
-              <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{{ t('sklad.col_price') }}</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{{ t('sklad.col_unit_price') }}</th>
               <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">{{ t('sklad.col_machines') }}</th>
               <th class="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">{{ t('common.actions') }}</th>
             </tr>
@@ -79,13 +80,23 @@
               <td class="px-4 py-3">
                 <div class="font-medium text-slate-800">{{ part.name }}</div>
               </td>
+              <td class="px-4 py-3 hidden sm:table-cell">
+                <span v-if="part.quantity != null" class="font-semibold tabular-nums text-slate-700">
+                  {{ part.quantity }}
+                  <span v-if="part.unit_data" class="text-xs font-normal text-slate-400 ml-0.5">{{ part.unit_data.short_name || part.unit_data.name }}</span>
+                </span>
+                <span v-else class="text-slate-300">—</span>
+              </td>
               <td class="px-4 py-3 text-slate-600 hidden sm:table-cell">
                 <span v-if="part.supplier">{{ part.supplier }}</span>
                 <span v-else class="text-slate-300">—</span>
               </td>
               <td class="px-4 py-3">
-                <span v-if="part.price" class="font-semibold text-slate-800 tabular-nums">
-                  {{ formatPrice(part.price) }}
+                <span v-if="part.unit_price != null" class="font-semibold text-slate-800 tabular-nums">
+                  ${{ Number(part.unit_price).toFixed(2) }}
+                  <span v-if="part.unit_data" class="text-xs font-normal text-slate-400">
+                    / {{ part.unit_data.short_name || part.unit_data.name }}
+                  </span>
                 </span>
                 <span v-else class="text-slate-300">—</span>
               </td>
@@ -145,6 +156,32 @@
                 :class="formError && !form.name.trim() ? 'border-rose-300' : 'border-slate-200'" />
             </div>
 
+            <!-- Quantity + Unit -->
+            <div class="flex gap-3">
+              <div class="flex-1">
+                <label class="block text-xs font-semibold text-slate-600 mb-1.5">
+                  {{ t('sklad.form_quantity') }}
+                </label>
+                <input v-model="form.quantity" type="number" min="0" step="0.001"
+                  :placeholder="t('sklad.form_quantity_ph')"
+                  class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2
+                         focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all" />
+              </div>
+              <div class="w-36">
+                <label class="block text-xs font-semibold text-slate-600 mb-1.5">
+                  {{ t('sklad.form_unit') }}
+                </label>
+                <select v-model="form.unit"
+                  class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white
+                         focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all">
+                  <option :value="null">—</option>
+                  <option v-for="u in allUnits" :key="u.id" :value="u.id">
+                    {{ u.short_name ? `${u.name} (${u.short_name})` : u.name }}
+                  </option>
+                </select>
+              </div>
+            </div>
+
             <!-- Price -->
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1.5">
@@ -154,6 +191,16 @@
                 :placeholder="t('sklad.form_price_ph')"
                 class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2
                        focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all" />
+              <!-- Unit price preview -->
+              <div v-if="form.price && form.quantity && Number(form.quantity) > 0"
+                class="mt-1.5 flex items-center gap-1.5 text-xs text-indigo-600 bg-indigo-50
+                       border border-indigo-100 rounded-lg px-2.5 py-1">
+                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                Birlik narxi: <strong>${{ (Number(form.price) / Number(form.quantity)).toFixed(4) }}</strong>
+                {{ form.unit ? allUnits.find(u => u.id === form.unit)?.short_name || '' : '' }} uchun
+              </div>
             </div>
 
             <!-- Supplier -->
@@ -276,7 +323,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useToast } from 'vue-toastification'
 import { useI18n } from '@/i18n'
-import { warehouseApi, machinesApi } from '@/api'
+import { warehouseApi, machinesApi, unitsApi } from '@/api'
 
 const { t } = useI18n()
 const toast = useToast()
@@ -288,6 +335,7 @@ const machineSearch = ref('')
 
 const spareParts = ref([])
 const allMachines = ref([])
+const allUnits = ref([])
 
 // ── Computed stats ──
 const uniqueSuppliers = computed(() => {
@@ -327,12 +375,14 @@ function formatPrice(val) {
 async function loadData() {
   loading.value = true
   try {
-    const [partsRes, machinesRes] = await Promise.all([
+    const [partsRes, machinesRes, unitsRes] = await Promise.all([
       warehouseApi.list(),
       machinesApi.list({ page_size: 500 }),
+      unitsApi.list({ page_size: 200 }),
     ])
     spareParts.value = partsRes.data.results ?? partsRes.data
     allMachines.value = machinesRes.data.results ?? []
+    allUnits.value = unitsRes.data.results ?? unitsRes.data
   } catch {
     toast.error(t('toast.load_error'))
   } finally {
@@ -349,6 +399,8 @@ const singleMachineId = ref(null)
 
 const form = ref({
   name: '',
+  quantity: '',
+  unit: null,
   price: '',
   supplier: '',
   machines: [],
@@ -359,7 +411,7 @@ function openAdd() {
   multiMode.value = false
   singleMachineId.value = null
   machineSearch.value = ''
-  form.value = { name: '', price: '', supplier: '', machines: [] }
+  form.value = { name: '', quantity: '', unit: null, price: '', supplier: '', machines: [] }
   formError.value = ''
   showFormModal.value = true
 }
@@ -372,6 +424,8 @@ function openEdit(part) {
   machineSearch.value = ''
   form.value = {
     name: part.name,
+    quantity: part.quantity ?? '',
+    unit: part.unit ?? null,
     price: part.price ?? '',
     supplier: part.supplier ?? '',
     machines: machineIds,
@@ -408,6 +462,8 @@ async function savePart() {
 
   const payload = {
     name: form.value.name.trim(),
+    quantity: form.value.quantity !== '' ? form.value.quantity : null,
+    unit: form.value.unit !== '' ? form.value.unit : null,
     price: form.value.price !== '' ? form.value.price : null,
     supplier: form.value.supplier.trim(),
     machines: machineIds,

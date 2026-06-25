@@ -168,6 +168,17 @@ export const auditApi = {
   list: (params) => api.get('/audit/', { params }),
 }
 
+export const dashboardApi = {
+  get: () => api.get('/dashboard/'),
+}
+
+export const unitsApi = {
+  list: (params) => api.get('/spare-parts/units/', { params }),
+  create: (data) => api.post('/spare-parts/units/', data),
+  update: (id, data) => api.patch(`/spare-parts/units/${id}/`, data),
+  delete: (id) => api.delete(`/spare-parts/units/${id}/`),
+}
+
 export const warehouseApi = {
   list: (params) => api.get('/spare-parts/', { params }),
   get: (id) => api.get(`/spare-parts/${id}/`),
@@ -183,5 +194,14 @@ export const maintenanceApi = {
   set: (machineId, data) => api.post(`/machines/${machineId}/maintenance/`, data),
   update: (machineId, data) => api.patch(`/machines/${machineId}/maintenance/`, data),
   delete: (machineId) => api.delete(`/machines/${machineId}/maintenance/`),
+  startRepair: (machineId) => api.post(`/machines/${machineId}/maintenance/start-repair/`),
+  history: (machineId) => api.get(`/machines/${machineId}/maintenance-history/`),
+  tasks: (machineId) => api.get(`/machines/${machineId}/maintenance/tasks/`),
+  addTask: (machineId, data) => api.post(`/machines/${machineId}/maintenance/tasks/`, data),
+  toggleTask: (machineId, taskId, data) => api.patch(`/machines/${machineId}/maintenance/tasks/${taskId}/`, data),
+  deleteTask: (machineId, taskId) => api.delete(`/machines/${machineId}/maintenance/tasks/${taskId}/`),
+  taskSpareParts: (machineId, taskId) => api.get(`/machines/${machineId}/maintenance/tasks/${taskId}/spare-parts/`),
+  addTaskSparePart: (machineId, taskId, data) => api.post(`/machines/${machineId}/maintenance/tasks/${taskId}/spare-parts/`, data),
+  removeTaskSparePart: (machineId, taskId, usageId) => api.delete(`/machines/${machineId}/maintenance/tasks/${taskId}/spare-parts/${usageId}/`),
   complete: (machineId, data) => api.post(`/machines/${machineId}/maintenance/complete/`, data),
 }

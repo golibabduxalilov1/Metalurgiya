@@ -317,6 +317,174 @@
               </div>
             </div>
           </div>
+          <!-- TO Tarixi (chap ustun pastida) -->
+          <div class="card overflow-hidden">
+
+            <!-- Section header + summary stats -->
+            <div class="px-6 py-5 border-b border-slate-100">
+              <div class="flex flex-wrap items-start justify-between gap-4">
+                <div class="section-header">
+                  <div class="section-icon bg-blue-50">
+                    <svg class="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                    </svg>
+                  </div>
+                  <h2 class="section-title">{{ t('machines.detail_to_history') }}</h2>
+                </div>
+                <div v-if="toHistory.length > 0" class="flex flex-wrap gap-3">
+                  <div class="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2">
+                    <svg class="w-3.5 h-3.5 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    <div>
+                      <div class="text-[10px] text-blue-400 font-medium uppercase tracking-wide">Jami TO</div>
+                      <div class="text-sm font-bold text-blue-700 tabular-nums">{{ toHistory.length }} ta</div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2 bg-violet-50 border border-violet-100 rounded-xl px-3 py-2">
+                    <svg class="w-3.5 h-3.5 text-violet-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <div>
+                      <div class="text-[10px] text-violet-400 font-medium uppercase tracking-wide">{{ t('machines.total_expense') }}</div>
+                      <div class="text-sm font-bold text-violet-700 tabular-nums">${{ totalExpense }}</div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
+                    <svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                    <div>
+                      <div class="text-[10px] text-emerald-400 font-medium uppercase tracking-wide">Oxirgi TO</div>
+                      <div class="text-sm font-bold text-emerald-700 tabular-nums">{{ formatDate(toHistory[0]?.completed_at) }}</div>
+                    </div>
+                  </div>
+                  <div v-if="toHistory[0]?.completed_by_name"
+                    class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+                    <svg class="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                    </svg>
+                    <div>
+                      <div class="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Oxirgi usta</div>
+                      <div class="text-sm font-bold text-slate-700">{{ toHistory[0].completed_by_name }}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="toHistoryLoading" class="p-6 space-y-3">
+              <div v-for="i in 3" :key="i" class="skeleton h-28 rounded-xl" :style="`animation-delay: ${i*80}ms`"></div>
+            </div>
+
+            <div v-else-if="toHistory.length === 0"
+              class="flex flex-col items-center justify-center py-12 text-center">
+              <div class="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center mb-3">
+                <svg class="w-7 h-7 text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                  <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                </svg>
+              </div>
+              <p class="text-slate-500 text-sm font-medium">Hali TO bajarilmagan</p>
+              <p class="text-slate-400 text-xs mt-1">{{ t('machines.detail_to_history_empty') }}</p>
+            </div>
+
+            <div v-else class="divide-y divide-slate-50">
+              <div v-for="(rec, idx) in toHistory" :key="rec.id" class="p-5 hover:bg-slate-50/50 transition-colors">
+                <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+                  <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-full bg-blue-600 text-white text-xs font-bold
+                                 flex items-center justify-center flex-shrink-0 shadow-sm">
+                      {{ toHistory.length - idx }}
+                    </div>
+                    <div>
+                      <div class="text-sm font-semibold text-slate-800">{{ rec.completed_by_name || '—' }}</div>
+                      <div class="text-xs text-slate-400 mt-0.5">{{ rec.interval_months }} {{ t('maintenance.interval_months') }}</div>
+                    </div>
+                    <div v-if="Number(rec.total_cost) > 0"
+                      class="ml-2 text-xs font-bold text-violet-600 bg-violet-50 border border-violet-100
+                             px-2 py-0.5 rounded-full">
+                      ${{ Number(rec.total_cost).toFixed(2) }}
+                    </div>
+                  </div>
+                  <div class="flex flex-wrap gap-3 text-xs">
+                    <div v-if="rec.repair_started_at"
+                      class="flex items-center gap-1.5 bg-blue-50 border border-blue-100 rounded-lg px-2.5 py-1.5">
+                      <svg class="w-3 h-3 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                      </svg>
+                      <span class="text-blue-500 font-medium">Boshlandi:</span>
+                      <span class="text-blue-700 font-semibold tabular-nums">{{ formatDateTime(rec.repair_started_at) }}</span>
+                    </div>
+                    <div class="flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 rounded-lg px-2.5 py-1.5">
+                      <svg class="w-3 h-3 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                      </svg>
+                      <span class="text-emerald-500 font-medium">Yakunlandi:</span>
+                      <span class="text-emerald-700 font-semibold tabular-nums">{{ formatDateTime(rec.completed_at) }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div v-if="rec.tasks_snapshot?.length" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div v-for="(task, ti) in rec.tasks_snapshot" :key="ti"
+                    class="bg-white border border-slate-100 rounded-xl p-3">
+                    <div class="flex items-center gap-2 mb-2">
+                      <div class="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                        :class="task.is_done ? 'bg-emerald-500' : 'bg-slate-200'">
+                        <svg v-if="task.is_done" class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                        </svg>
+                      </div>
+                      <span class="text-sm font-medium text-slate-800 truncate">{{ task.title }}</span>
+                    </div>
+                    <div v-if="task.assignee_name" class="flex items-center gap-1 text-xs text-slate-500 mb-2">
+                      <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                      </svg>
+                      {{ task.assignee_name }}
+                    </div>
+                    <div v-if="task.spare_parts?.length" class="space-y-1">
+                      <div class="text-[10px] text-slate-400 font-semibold uppercase tracking-wide">{{ t('machines.to_history_parts') }}:</div>
+                      <div class="flex flex-wrap gap-1">
+                        <span v-for="(sp, si) in task.spare_parts" :key="si"
+                          class="inline-flex items-center gap-1 text-[11px] bg-amber-50 border border-amber-100
+                                 text-amber-800 px-2 py-0.5 rounded-full font-medium">
+                          {{ sp.name }}
+                          <span class="text-amber-600">— {{ sp.quantity_used }} {{ sp.unit }}</span>
+                          <span v-if="sp.cost && Number(sp.cost) > 0" class="text-violet-600 font-bold">= ${{ Number(sp.cost).toFixed(2) }}</span>
+                        </span>
+                      </div>
+                    </div>
+                    <div v-else class="text-[11px] text-slate-300 italic">{{ t('machines.to_history_no_parts') }}</div>
+                    <!-- Per-task cost -->
+                    <div v-if="task.task_cost && Number(task.task_cost) > 0"
+                      class="mt-2 text-right text-[11px] font-semibold text-violet-600">
+                      {{ t('machines.expense_per_to') }}: ${{ Number(task.task_cost).toFixed(2) }}
+                    </div>
+                  </div>
+                </div>
+                <div v-if="rec.notes"
+                  class="mt-3 flex items-start gap-2 text-xs text-slate-500 bg-slate-50
+                         border-l-2 border-slate-200 pl-3 py-2 rounded-r-lg">
+                  <svg class="w-3.5 h-3.5 text-slate-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
+                  </svg>
+                  <span class="italic">{{ rec.notes }}</span>
+                </div>
+                <!-- TO jami xarajati -->
+                <div v-if="Number(rec.total_cost) > 0"
+                  class="mt-3 flex items-center justify-between bg-violet-50 border border-violet-100
+                         rounded-xl px-4 py-2.5">
+                  <span class="text-sm font-semibold text-violet-700">{{ t('machines.total_expense') }}</span>
+                  <span class="text-lg font-bold text-violet-700 tabular-nums">${{ Number(rec.total_cost).toFixed(2) }}</span>
+                </div>
+              </div>
+            </div>
+
+          </div><!-- /TO tarixi -->
+
         </div>
 
         <!-- Right col -->
@@ -402,8 +570,10 @@
               </div>
             </div>
           </div>
+
         </div>
       </div>
+
     </template>
 
     <!-- Change Status Modal -->
@@ -432,11 +602,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { useToast } from 'vue-toastification'
 import { useAuthStore } from '@/store/auth'
-import { machinesApi } from '@/api'
+import { machinesApi, maintenanceApi } from '@/api'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import InfoField from '@/components/common/InfoField.vue'
 import ChangeStatusModal from '@/components/machines/ChangeStatusModal.vue'
@@ -455,6 +625,11 @@ const loading = ref(true)
 const showStatusModal = ref(false)
 const showAssignModal = ref(false)
 const deleteAttachmentTarget = ref(null)
+const toHistory = ref([])
+const toHistoryLoading = ref(false)
+const totalExpense = computed(() =>
+  toHistory.value.reduce((sum, r) => sum + Number(r.total_cost || 0), 0).toFixed(2)
+)
 
 const colorMap = { green: 'working', yellow: 'idle', red: 'repair', gray: 'retired', blue: 'maintenance' }
 
@@ -523,7 +698,22 @@ function onAssignUpdated() {
   loadMachine()
 }
 
-onMounted(loadMachine)
+async function loadToHistory() {
+  toHistoryLoading.value = true
+  try {
+    const res = await maintenanceApi.history(route.params.id)
+    toHistory.value = res.data
+  } catch {
+    // silently fail — history is not critical
+  } finally {
+    toHistoryLoading.value = false
+  }
+}
+
+onMounted(() => {
+  loadMachine()
+  loadToHistory()
+})
 </script>
 
 <style scoped>

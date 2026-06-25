@@ -276,6 +276,7 @@ class MaintenanceSchedule(models.Model):
     last_maintenance_date = models.DateField('Дата последнего ТО', null=True, blank=True)
     next_maintenance_date = models.DateField('Дата следующего ТО')
     notes = models.TextField('Примечания', blank=True)
+    repair_started_at = models.DateTimeField('Начало ремонта', null=True, blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
         related_name='created_maintenance_schedules', null=True, blank=True
@@ -297,18 +298,113 @@ class MaintenanceSchedule(models.Model):
         return f"ТО: {self.machine} → {self.next_maintenance_date}"
 
     @property
+    def tasks_total(self):
+        return self.tasks.count()
+
+    @property
+    def tasks_done(self):
+        return self.tasks.filter(is_done=True).count()
+
+    @property
     def days_until(self):
         from django.utils import timezone
         delta = self.next_maintenance_date - timezone.now().date()
         return delta.days
 
     @property
+    def in_repair(self):
+        return self.repair_started_at is not None
+
+    @property
     def alert_level(self):
+        if self.in_repair:
+            return 'in_repair'
         days = self.days_until
         if days < 0:
             return 'overdue'
         if days <= 7:
-            return 'critical'
-        if days <= 30:
-            return 'warning'
+            return 'near'
         return 'ok'
+
+
+class RepairTask(models.Model):
+    """Vazifalar ro'yxati — remont davomidagi topshiriqlar"""
+    schedule = models.ForeignKey(
+        MaintenanceSchedule, on_delete=models.CASCADE,
+        related_name='tasks', verbose_name='График ТО'
+    )
+    title = models.CharField('Vazifa', max_length=500)
+    assignee = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='repair_tasks', verbose_name='Mas\'ul foydalanuvchi'
+    )
+    due_date = models.DateField('Bajarilish muddati', null=True, blank=True)
+    is_done = models.BooleanField('Bajarildi', default=False)
+    done_at = models.DateTimeField('Bajarilgan vaqt', null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'repair_tasks'
+        verbose_name = 'Remont vazifasi'
+        verbose_name_plural = 'Remont vazifalari'
+        ordering = ['created_at']
+
+    def __str__(self):
+        return self.title
+
+
+class MaintenanceHistory(models.Model):
+    """TO tarixi — har bir remont yakunlanganida yaratiladi"""
+    machine = models.ForeignKey(
+        Machine, on_delete=models.CASCADE,
+        related_name='maintenance_history', verbose_name='Stanok'
+    )
+    repair_started_at = models.DateTimeField('Remont boshlangan vaqt', null=True, blank=True)
+    completed_at = models.DateTimeField('Yakunlangan vaqt', auto_now_add=True)
+    completed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, verbose_name='Bajargan'
+    )
+    interval_months = models.PositiveIntegerField('Interval (oy)', default=0)
+    notes = models.TextField('Izoh', blank=True)
+    tasks_snapshot = models.JSONField('Vazifalar snapshot', default=list)
+    total_cost = models.DecimalField('Jami xarajat', max_digits=15, decimal_places=2, default=0)
+
+    class Meta:
+        db_table = 'maintenance_history'
+        verbose_name = 'TO tarixi'
+        verbose_name_plural = 'TO tarixi'
+        ordering = ['-completed_at']
+
+    def __str__(self):
+        return f"TO: {self.machine} — {self.completed_at.date()}"
+
+
+class TaskSparePart(models.Model):
+    """Vazifada ishlatilgan ehtiyot qism"""
+    task = models.ForeignKey(
+        RepairTask, on_delete=models.CASCADE,
+        related_name='spare_parts_used', verbose_name='Vazifa'
+    )
+    spare_part = models.ForeignKey(
+        'warehouse.SparePart', on_delete=models.CASCADE,
+        related_name='task_usages', verbose_name='Ehtiyot qism'
+    )
+    quantity_used = models.DecimalField(
+        'Ishlatilgan miqdor', max_digits=15, decimal_places=3
+    )
+    notes = models.TextField('Izoh', blank=True)
+    cost = models.DecimalField(
+        'Xarajat (dollar)', max_digits=15, decimal_places=2, null=True, blank=True
+    )
+    deducted = models.BooleanField('Ombordan ayirildi', default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'task_spare_parts'
+        verbose_name = 'Vazifadagi ehtiyot qism'
+        verbose_name_plural = 'Vazifadagi ehtiyot qismlar'
+
+    def __str__(self):
+        return f"{self.task} — {self.spare_part} x{self.quantity_used}"
