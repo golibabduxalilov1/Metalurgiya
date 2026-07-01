@@ -99,7 +99,7 @@
             <div class="font-medium text-sm text-slate-800 truncate">{{ m.name }}</div>
             <div class="text-xs text-slate-400 mt-0.5">{{ m.inventory_number }}</div>
             <div v-if="m.workshop_name" class="text-xs text-slate-400 truncate">{{ m.workshop_name }}</div>
-            <div class="mt-3">
+            <div v-if="isSuperuser" class="mt-3">
               <button @click="openSimpleSchedule(m)" data-tutorial="btn-assign"
                 class="w-full text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700
                        rounded-lg px-3 py-1.5 transition-colors">
@@ -126,7 +126,7 @@
             :to="`/machines/${item.machine}`" data-tutorial="card-near"
             class="kanban-card kanban-card--near block relative">
             <!-- Edit btn top-right -->
-            <button @click.prevent.stop="openEdit(item)" class="edit-btn" :title="t('maintenance.schedule_edit')">
+            <button v-if="isSuperuser" @click.prevent.stop="openEdit(item)" class="edit-btn" :title="t('maintenance.schedule_edit')">
               <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
               </svg>
@@ -165,7 +165,7 @@
             :to="`/machines/${item.machine}`" data-tutorial="card-overdue"
             class="kanban-card kanban-card--overdue block relative">
             <!-- Edit btn top-right -->
-            <button @click.prevent.stop="openEdit(item)" class="edit-btn" :title="t('maintenance.schedule_edit')">
+            <button v-if="isSuperuser" @click.prevent.stop="openEdit(item)" class="edit-btn" :title="t('maintenance.schedule_edit')">
               <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
               </svg>
@@ -203,7 +203,7 @@
           <div v-for="item in filteredInRepair" :key="item.machine" data-tutorial="card-repair"
             class="kanban-card kanban-card--repair relative">
             <!-- Edit btn top-right -->
-            <button @click.stop="openEdit(item)" class="edit-btn" :title="t('maintenance.schedule_edit')">
+            <button v-if="isSuperuser" @click.stop="openEdit(item)" class="edit-btn" :title="t('maintenance.schedule_edit')">
               <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
               </svg>
@@ -279,7 +279,7 @@
             :to="`/machines/${item.machine}`" data-tutorial="card-ok"
             class="kanban-card kanban-card--ok block relative">
             <!-- Edit btn top-right -->
-            <button @click.prevent.stop="openEdit(item)" class="edit-btn" :title="t('maintenance.schedule_edit')">
+            <button v-if="isSuperuser" @click.prevent.stop="openEdit(item)" class="edit-btn" :title="t('maintenance.schedule_edit')">
               <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
               </svg>
@@ -715,9 +715,12 @@ import { useI18n } from '@/i18n'
 import { maintenanceApi, machinesApi, workshopsApi, statusesApi } from '@/api'
 import TutorialOverlay from '@/components/common/TutorialOverlay.vue'
 import dayjs from 'dayjs'
+import { useAuthStore } from '@/store/auth'
 
 const { t } = useI18n()
 const toast = useToast()
+const auth = useAuthStore()
+const isSuperuser = computed(() => auth.isSuperuser)
 
 const loading = ref(true)
 const saving = ref(false)

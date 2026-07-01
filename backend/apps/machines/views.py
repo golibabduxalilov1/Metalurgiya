@@ -917,8 +917,8 @@ class MachineViewSet(viewsets.ModelViewSet):
             except MaintenanceSchedule.DoesNotExist:
                 return Response(None)
 
-        if not request.user.role == 'admin':
-            return Response({'detail': 'Только администратор может задавать график ТО'},
+        if not request.user.is_superuser:
+            return Response({'detail': 'Только суперадминистратор может задавать график ТО'},
                             status=status.HTTP_403_FORBIDDEN)
 
         serializer = MaintenanceScheduleWriteSerializer(data=request.data)
