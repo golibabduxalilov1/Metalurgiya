@@ -124,6 +124,9 @@ export const machinesApi = {
   exportExcel: (params) => api.get('/machines/export-excel/', {
     params, responseType: 'blob'
   }),
+  exportCosts: (params) => api.get('/machines/export-costs/', {
+    params, responseType: 'blob'
+  }),
   importExcel: (formData) => api.post('/machines/import-excel/', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
@@ -170,6 +173,11 @@ export const auditApi = {
 
 export const dashboardApi = {
   get: (params) => api.get('/dashboard/', { params }),
+}
+
+export const exchangeRateApi = {
+  get: () => api.get('/exchange-rate/'),
+  update: (data) => api.patch('/exchange-rate/', data),
 }
 
 export const unitsApi = {

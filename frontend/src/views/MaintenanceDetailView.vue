@@ -342,11 +342,21 @@
                   <span class="toggle-thumb" :class="taskItem.has_bonus ? 'toggle-thumb--on' : ''"></span>
                 </button>
                 <span class="text-xs font-medium text-slate-600">{{ t('maintenance.task_bonus') }}</span>
-                <input v-if="taskItem.has_bonus" v-model.number="taskItem.bonus_amount" type="number" min="0" step="0.01"
-                  :disabled="taskItem.is_done" @change="saveBonusAmount(taskItem)"
-                  :placeholder="t('maintenance.task_bonus_ph')"
-                  class="w-36 text-sm border border-slate-200 rounded-lg px-3 py-1.5
-                         focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all disabled:opacity-50" />
+                <template v-if="taskItem.has_bonus">
+                  <div class="relative">
+                    <input v-model.number="bonusSomInputs[taskItem.id]" type="number" min="0" step="1"
+                      :disabled="taskItem.is_done" @change="saveBonusAmount(taskItem)"
+                      :placeholder="t('maintenance.task_bonus_ph')"
+                      class="no-spinner w-36 text-sm border border-slate-200 rounded-lg pl-3 pr-12 py-1.5
+                             focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all disabled:opacity-50" />
+                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
+                      {{ t('maintenance.som_suffix') }}
+                    </span>
+                  </div>
+                  <span v-if="bonusUsdPreview(taskItem)" class="text-xs text-slate-500 whitespace-nowrap">
+                    ≈ ${{ bonusUsdPreview(taskItem) }}
+                  </span>
+                </template>
               </div>
 
             </div>
@@ -419,12 +429,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useToast } from 'vue-toastification'
 import { useI18n } from '@/i18n'
 import { useAuthStore } from '@/store/auth'
-import { maintenanceApi, machinesApi, usersApi, warehouseApi } from '@/api'
+import { maintenanceApi, machinesApi, usersApi, warehouseApi, exchangeRateApi } from '@/api'
 
 import dayjs from 'dayjs'
 
@@ -441,6 +451,15 @@ const machine = ref(null)
 const schedule = ref(null)
 const tasks = ref([])
 const employees = ref([])
+const usdToSom = ref(12700)
+const bonusSomInputs = reactive({})
+
+function somToUsd(som) { return usdToSom.value ? +(som / usdToSom.value).toFixed(2) : 0 }
+function usdToSomValue(usd) { return usdToSom.value ? Math.round(usd * usdToSom.value) : 0 }
+function bonusUsdPreview(taskItem) {
+  const som = bonusSomInputs[taskItem.id]
+  return som ? somToUsd(som).toFixed(2) : null
+}
 
 // ── Computed ──
 const doneTasks = computed(() => tasks.value.filter(t => t.is_done).length)
@@ -459,14 +478,21 @@ async function loadAll() {
       machinesApi.get(machineId),
       maintenanceApi.get(machineId),
       maintenanceApi.tasks(machineId),
+      exchangeRateApi.get(),
     ]
     if (auth.canWrite) {
       requests.push(usersApi.list({ page_size: 200, is_active: 'true' }))
     }
-    const [machineRes, scheduleRes, tasksRes, empRes] = await Promise.all(requests)
+    const [machineRes, scheduleRes, tasksRes, rateRes, empRes] = await Promise.all(requests)
     machine.value = machineRes.data
     schedule.value = scheduleRes.data
     tasks.value = tasksRes.data
+    usdToSom.value = Number(rateRes.data.usd_to_som) || usdToSom.value
+    for (const taskItem of tasks.value) {
+      if (taskItem.has_bonus && taskItem.bonus_amount) {
+        bonusSomInputs[taskItem.id] = usdToSomValue(Number(taskItem.bonus_amount))
+      }
+    }
     if (empRes) employees.value = empRes.data.results || empRes.data
   } catch {
     toast.error(t('toast.load_error'))
@@ -623,10 +649,14 @@ async function removeTaskSparePart(task, usage) {
 // ── Task bonus (Yonlanma) ──
 async function toggleBonus(taskItem) {
   const newValue = !taskItem.has_bonus
+  const bonusAmount = newValue
+    ? (bonusSomInputs[taskItem.id] ? somToUsd(bonusSomInputs[taskItem.id]) : null)
+    : null
+  if (!newValue) delete bonusSomInputs[taskItem.id]
   try {
     const res = await maintenanceApi.toggleTask(machineId, taskItem.id, {
       has_bonus: newValue,
-      bonus_amount: newValue ? taskItem.bonus_amount : null,
+      bonus_amount: bonusAmount,
     })
     const idx = tasks.value.findIndex(t => t.id === taskItem.id)
     if (idx !== -1) tasks.value[idx] = res.data
@@ -636,9 +666,10 @@ async function toggleBonus(taskItem) {
 }
 
 async function saveBonusAmount(taskItem) {
+  const som = bonusSomInputs[taskItem.id]
   try {
     const res = await maintenanceApi.toggleTask(machineId, taskItem.id, {
-      bonus_amount: taskItem.bonus_amount || null,
+      bonus_amount: som ? somToUsd(som) : null,
     })
     const idx = tasks.value.findIndex(t => t.id === taskItem.id)
     if (idx !== -1) tasks.value[idx] = res.data
@@ -678,6 +709,15 @@ onMounted(loadAll)
 
 <style scoped>
 .card { @apply bg-white rounded-2xl border border-slate-200 shadow-sm; }
+
+.no-spinner::-webkit-outer-spin-button,
+.no-spinner::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.no-spinner {
+  -moz-appearance: textfield;
+}
 
 .info-block { @apply bg-slate-50 rounded-xl p-3; }
 .info-label { @apply text-[10px] font-semibold text-slate-400 uppercase tracking-wide; }

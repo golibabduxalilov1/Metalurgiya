@@ -110,6 +110,41 @@
       </div>
     </div>
 
+    <!-- Currency tab -->
+    <div v-if="activeTab === 'currency'">
+      <div class="card overflow-hidden">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <div class="flex items-center gap-3">
+            <div class="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
+              <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+            </div>
+            <h3 class="text-sm font-semibold text-slate-700">{{ t('directories.panel_currency') }}</h3>
+          </div>
+        </div>
+        <div class="p-5 space-y-4">
+          <p class="text-xs text-slate-500">{{ t('directories.currency_hint') }}</p>
+          <div v-if="loadingRate" class="skeleton h-11 rounded-lg max-w-xs"></div>
+          <div v-else class="flex items-end gap-3 flex-wrap">
+            <div>
+              <label class="form-label">{{ t('directories.currency_rate_label') }}</label>
+              <input v-model.number="rateForm.usd_to_som" type="number" min="0.01" step="0.01"
+                class="form-input max-w-[180px]" />
+            </div>
+            <button @click="saveRate" :disabled="savingRate || !rateForm.usd_to_som"
+              class="btn-md btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
+              {{ savingRate ? t('common.saving') : t('common.save') }}
+            </button>
+          </div>
+          <p v-if="exchangeRate.updated_at" class="text-xs text-slate-400">
+            {{ t('directories.currency_updated_at') }}: {{ new Date(exchangeRate.updated_at).toLocaleString() }}
+          </p>
+        </div>
+      </div>
+    </div>
+
     <!-- Statuses tab -->
     <div v-if="activeTab === 'statuses'">
       <div class="card overflow-hidden">
@@ -262,19 +297,22 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useToast } from 'vue-toastification'
-import { workshopsApi, machineTypesApi, statusesApi, unitsApi } from '@/api'
+import { workshopsApi, machineTypesApi, statusesApi, unitsApi, exchangeRateApi } from '@/api'
 import DirectoryPanel from '@/components/common/DirectoryPanel.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import { useI18n } from '@/i18n'
+import { useAuthStore } from '@/store/auth'
 
 const toast = useToast()
 const { t } = useI18n()
+const auth = useAuthStore()
 const activeTab = ref('workshops')
 const tabs = computed(() => [
   { id: 'workshops', label: t('directories.tab_workshops') },
   { id: 'types', label: t('directories.tab_types') },
   { id: 'statuses', label: t('directories.tab_statuses') },
   { id: 'units', label: t('directories.tab_units') },
+  ...(auth.isAdmin ? [{ id: 'currency', label: t('directories.tab_currency') }] : []),
 ])
 
 const workshops = ref([])
@@ -286,6 +324,11 @@ const loadingWs = ref(false)
 const loadingTypes = ref(false)
 const loadingStatuses = ref(false)
 const loadingUnits = ref(false)
+
+const exchangeRate = ref({ usd_to_som: null, updated_at: null })
+const rateForm = reactive({ usd_to_som: null })
+const loadingRate = ref(false)
+const savingRate = ref(false)
 
 const showModal = ref(false)
 const saving = ref(false)
@@ -376,6 +419,27 @@ async function loadAll() {
   const uRes = await unitsApi.list({ page_size: 200 })
   units.value = uRes.data.results || uRes.data
   loadingUnits.value = false
+
+  if (auth.isAdmin) {
+    loadingRate.value = true
+    const rRes = await exchangeRateApi.get()
+    exchangeRate.value = rRes.data
+    rateForm.usd_to_som = Number(rRes.data.usd_to_som)
+    loadingRate.value = false
+  }
+}
+
+async function saveRate() {
+  savingRate.value = true
+  try {
+    const res = await exchangeRateApi.update({ usd_to_som: rateForm.usd_to_som })
+    exchangeRate.value = res.data
+    toast.success(t('toast.update_success'))
+  } catch (e) {
+    toast.error(e.response?.data?.message || t('toast.error'))
+  } finally {
+    savingRate.value = false
+  }
 }
 
 onMounted(loadAll)

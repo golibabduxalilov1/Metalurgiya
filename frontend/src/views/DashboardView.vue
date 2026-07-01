@@ -29,8 +29,110 @@
               class="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white" />
           </div>
         </Transition>
+        <button @click="openCostsExportModal"
+          class="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-slate-200
+                 bg-white hover:bg-indigo-50 hover:border-indigo-300
+                 text-xs font-semibold text-slate-700 hover:text-indigo-700
+                 transition-all duration-150 shadow-sm cursor-pointer select-none">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+          </svg>
+          Скачать расходы
+        </button>
       </div>
     </div>
+
+    <!-- ══════════════════════════════════════════
+         СКАЧАТЬ РАСХОДЫ — модальное окно фильтра
+    ══════════════════════════════════════════ -->
+    <Transition name="modal">
+      <div v-if="showCostsModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-[2px]" @click="showCostsModal = false"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-5">
+          <h3 class="text-base font-bold text-slate-900">Скачать расходы</h3>
+
+          <!-- Диапазон дат -->
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1.5">Дата начала</label>
+              <input v-model="costsFilter.date_from" type="date"
+                class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2
+                       focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1.5">Дата окончания</label>
+              <input v-model="costsFilter.date_to" type="date"
+                class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2
+                       focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all" />
+            </div>
+          </div>
+
+          <!-- Цех -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Цех</label>
+            <select v-model="costsFilter.workshop_id"
+              class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2
+                     focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all bg-white">
+              <option value="">Все</option>
+              <option v-for="ws in costsWorkshops" :key="ws.id" :value="ws.id">{{ ws.name }}</option>
+            </select>
+          </div>
+
+          <!-- Состояние станка -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Состояние станка</label>
+            <select v-model="costsFilter.status"
+              class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2
+                     focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all bg-white">
+              <option value="all">Все</option>
+              <option value="working">Работает</option>
+              <option value="in_repair">В ремонте</option>
+              <option value="no_schedule">Нет графика ТО</option>
+            </select>
+          </div>
+
+          <!-- Выбор формата -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Формат</label>
+            <div class="flex bg-slate-100 rounded-xl p-1 gap-1">
+              <button @click="costsFormat = 'excel'" type="button"
+                class="flex-1 px-3 py-1.5 text-xs font-medium rounded-lg transition-all"
+                :class="costsFormat === 'excel'
+                  ? 'bg-white text-emerald-700 shadow-sm font-semibold'
+                  : 'text-slate-500 hover:text-slate-700'">
+                Excel
+              </button>
+              <button @click="costsFormat = 'pdf'" type="button"
+                class="flex-1 px-3 py-1.5 text-xs font-medium rounded-lg transition-all"
+                :class="costsFormat === 'pdf'
+                  ? 'bg-white text-rose-700 shadow-sm font-semibold'
+                  : 'text-slate-500 hover:text-slate-700'">
+                PDF
+              </button>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="flex gap-2 pt-1">
+            <button @click="showCostsModal = false"
+              class="flex-1 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">
+              Отмена
+            </button>
+            <button @click="doExportCosts" :disabled="exportingCosts"
+              :class="[
+                'flex-1 py-2.5 text-sm text-white rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-60',
+                costsFormat === 'excel' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'
+              ]">
+              <svg v-if="exportingCosts" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+              </svg>
+              {{ exportingCosts ? 'Подготовка файла...' : 'Скачать' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
 
     <!-- ══════════════════════════════════════════
          1. UMUMIY XARAJATLAR
@@ -493,8 +595,11 @@ import {
   BarElement, LineElement, PointElement,
   ArcElement, Tooltip, Legend, Filler,
 } from 'chart.js'
-import { dashboardApi } from '@/api'
+import { dashboardApi, machinesApi, workshopsApi } from '@/api'
+import { useToast } from 'vue-toastification'
 import dayjs from 'dayjs'
+
+const toast = useToast()
 
 ChartJS.register(
   CategoryScale, LinearScale,
@@ -703,6 +808,60 @@ async function loadData() {
 }
 
 loadData()
+
+// ── Скачать расходы (Excel/PDF) ──
+const showCostsModal = ref(false)
+const costsFormat = ref('excel')
+const exportingCosts = ref(false)
+const costsWorkshops = ref([])
+const costsFilter = ref({ date_from: '', date_to: '', workshop_id: '', status: 'all' })
+
+async function openCostsExportModal() {
+  costsFormat.value = 'excel'
+  costsFilter.value = { date_from: '', date_to: '', workshop_id: '', status: 'all' }
+  if (!costsWorkshops.value.length) {
+    try {
+      const res = await workshopsApi.list({ page_size: 200 })
+      costsWorkshops.value = res.data.results || res.data || []
+    } catch { /* silent */ }
+  }
+  showCostsModal.value = true
+}
+
+async function doExportCosts() {
+  exportingCosts.value = true
+  try {
+    const params = { export_format: costsFormat.value }
+    if (costsFilter.value.date_from) params.date_from = costsFilter.value.date_from
+    if (costsFilter.value.date_to) params.date_to = costsFilter.value.date_to
+    if (costsFilter.value.workshop_id) params.workshop_id = costsFilter.value.workshop_id
+    if (costsFilter.value.status) params.status = costsFilter.value.status
+
+    const res = await machinesApi.exportCosts(params)
+
+    const isExcel = costsFormat.value === 'excel'
+    const mime = isExcel
+      ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      : 'application/pdf'
+    const ext = isExcel ? 'xlsx' : 'pdf'
+    const ts = dayjs().format('YYYYMMDD_HHmm')
+
+    const url = URL.createObjectURL(new Blob([res.data], { type: mime }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `raskhody_${ts}.${ext}`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+
+    showCostsModal.value = false
+  } catch {
+    toast.error('Произошла ошибка')
+  } finally {
+    exportingCosts.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -723,6 +882,9 @@ loadData()
 .slide-down-leave-active { transition: all .25s ease; }
 .slide-down-enter-from,
 .slide-down-leave-to { opacity: 0; transform: translateY(-8px); }
+
+.modal-enter-active, .modal-leave-active { transition: opacity 0.2s; }
+.modal-enter-from, .modal-leave-to       { opacity: 0; }
 
 @keyframes fadeIn { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } }
 .animate-fade-in { animation: fadeIn .25s ease; }
