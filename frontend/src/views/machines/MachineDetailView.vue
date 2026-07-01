@@ -144,11 +144,11 @@
                 <div class="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center
                             flex-shrink-0 shadow-md shadow-indigo-500/25">
                   <span class="text-white font-bold text-sm">
-                    {{ (machine.operator_data.first_name || '?')[0].toUpperCase() }}
+                    {{ (machine.operator_data.full_name || '?')[0].toUpperCase() }}
                   </span>
                 </div>
                 <div>
-                  <div class="text-sm font-semibold text-slate-900">{{ machine.operator_data.first_name }}</div>
+                  <div class="text-sm font-semibold text-slate-900">{{ machine.operator_data.full_name }}</div>
                   <div class="text-xs text-slate-500 mt-0.5">{{ machine.operator_data.position }}</div>
                 </div>
               </div>
@@ -458,6 +458,11 @@
                       </div>
                     </div>
                     <div v-else class="text-[11px] text-slate-300 italic">{{ t('machines.to_history_no_parts') }}</div>
+                    <!-- Yonlanma -->
+                    <div v-if="task.has_bonus && task.bonus_amount && Number(task.bonus_amount) > 0"
+                      class="mt-2 text-[11px] font-medium text-amber-700">
+                      {{ t('machines.to_history_bonus') }} — ${{ Number(task.bonus_amount).toFixed(2) }}
+                    </div>
                     <!-- Per-task cost -->
                     <div v-if="task.task_cost && Number(task.task_cost) > 0"
                       class="mt-2 text-right text-[11px] font-semibold text-violet-600">

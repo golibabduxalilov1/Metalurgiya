@@ -117,19 +117,6 @@
         <!-- Role badge (hidden on mobile) -->
         <div class="hidden sm:block" :class="roleBadgeClass">{{ auth.userRole }}</div>
 
-        <!-- Language toggle button -->
-        <button @click="langStore.toggle()"
-          class="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-200
-                 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-200
-                 text-xs font-bold text-slate-600 hover:text-indigo-700
-                 transition-all duration-200 cursor-pointer flex-shrink-0 select-none">
-          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round"
-              d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/>
-          </svg>
-          {{ langStore.lang === 'ru' ? 'UZ' : 'RU' }}
-        </button>
-
         <!-- Notifications -->
         <div class="relative" ref="notifRef">
           <button @click="notifOpen = !notifOpen"
@@ -257,13 +244,11 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { RouterView, RouterLink, useRoute } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
-import { useLangStore } from '@/store/lang'
 import { useI18n } from '@/i18n'
 import NavItem from '@/components/common/NavItem.vue'
 import { maintenanceApi } from '@/api'
 
 const auth = useAuthStore()
-const langStore = useLangStore()
 const { t } = useI18n()
 const route = useRoute()
 const sidebarCollapsed = ref(false)

@@ -169,7 +169,7 @@ export const auditApi = {
 }
 
 export const dashboardApi = {
-  get: () => api.get('/dashboard/'),
+  get: (params) => api.get('/dashboard/', { params }),
 }
 
 export const unitsApi = {
@@ -190,6 +190,7 @@ export const warehouseApi = {
 export const maintenanceApi = {
   alerts: () => api.get('/maintenance/alerts/'),
   all: () => api.get('/maintenance/alerts/', { params: { all: 'true' } }),
+  export: (params) => api.get('/maintenance/export/', { params, responseType: 'blob' }),
   get: (machineId) => api.get(`/machines/${machineId}/maintenance/`),
   set: (machineId, data) => api.post(`/machines/${machineId}/maintenance/`, data),
   update: (machineId, data) => api.patch(`/machines/${machineId}/maintenance/`, data),

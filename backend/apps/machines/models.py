@@ -333,7 +333,7 @@ class RepairTask(models.Model):
         MaintenanceSchedule, on_delete=models.CASCADE,
         related_name='tasks', verbose_name='График ТО'
     )
-    title = models.CharField('Vazifa', max_length=500)
+    title = models.CharField('Vazifa', max_length=500, blank=True, default='')
     assignee = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
         null=True, blank=True,
@@ -342,6 +342,10 @@ class RepairTask(models.Model):
     due_date = models.DateField('Bajarilish muddati', null=True, blank=True)
     is_done = models.BooleanField('Bajarildi', default=False)
     done_at = models.DateTimeField('Bajarilgan vaqt', null=True, blank=True)
+    has_bonus = models.BooleanField('Yonlanma', default=False)
+    bonus_amount = models.DecimalField(
+        'Yonlanma summasi', max_digits=15, decimal_places=2, null=True, blank=True
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

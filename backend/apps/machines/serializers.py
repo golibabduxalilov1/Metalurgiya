@@ -240,7 +240,8 @@ class RepairTaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = RepairTask
         fields = ['id', 'schedule', 'title', 'assignee', 'assignee_name', 'due_date',
-                  'is_done', 'done_at', 'created_at', 'spare_parts_used', 'is_mine']
+                  'is_done', 'done_at', 'has_bonus', 'bonus_amount', 'created_at',
+                  'spare_parts_used', 'is_mine']
         read_only_fields = ['schedule', 'done_at', 'created_at']
 
     def get_assignee_name(self, obj):

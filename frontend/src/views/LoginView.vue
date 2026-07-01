@@ -86,18 +86,6 @@
                 <div class="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
                 Machine Registry
               </div>
-              <!-- Language toggle on login page -->
-              <button @click="langStore.toggle()"
-                class="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-200
-                       bg-slate-50 hover:bg-indigo-50 hover:border-indigo-200
-                       text-xs font-bold text-slate-600 hover:text-indigo-700
-                       transition-all duration-200 cursor-pointer select-none">
-                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round"
-                    d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/>
-                </svg>
-                {{ langStore.lang === 'ru' ? 'UZ' : 'RU' }}
-              </button>
             </div>
             <h2 class="text-2xl font-bold text-slate-900 tracking-tight">{{ t('login.title') }}</h2>
             <p class="text-slate-500 text-sm mt-1.5">{{ t('login.subtitle') }}</p>
@@ -198,13 +186,11 @@
 import { ref, reactive } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
-import { useLangStore } from '@/store/lang'
 import { useI18n } from '@/i18n'
 
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
-const langStore = useLangStore()
 const { t } = useI18n()
 
 const form = reactive({ username: '', password: '' })

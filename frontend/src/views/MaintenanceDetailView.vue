@@ -91,7 +91,7 @@
             </div>
           </div>
           <button v-if="auth.isAdmin"
-            @click="showAddForm = !showAddForm"
+            @click="toggleAddForm"
             class="flex items-center gap-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700
                    rounded-xl px-3 py-2 transition-colors">
             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
@@ -120,14 +120,6 @@
           <div v-if="showAddForm" class="px-5 pt-4 pb-1">
             <div class="bg-blue-50 border border-blue-100 rounded-2xl p-4 space-y-3">
               <h3 class="text-xs font-semibold text-blue-700 uppercase tracking-wide">{{ t('maintenance.task_add_label') }}</h3>
-              <!-- Task name -->
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">{{ t('maintenance.task_name') }} *</label>
-                <input v-model="newTask.title" type="text" :placeholder="t('maintenance.task_name_ph')"
-                  class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white
-                         focus:outline-none focus:ring-2 focus:ring-blue-300 transition-all"
-                  :class="formError && !newTask.title.trim() ? 'border-rose-300' : ''" />
-              </div>
               <!-- Assignee + due date row -->
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
@@ -148,6 +140,90 @@
                            focus:outline-none focus:ring-2 focus:ring-blue-300 transition-all" />
                 </div>
               </div>
+
+              <!-- Spare parts selection (inline) -->
+              <div class="border-t border-blue-100 pt-3">
+                <h4 class="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2">{{ t('maintenance.sp_modal_title') }}</h4>
+
+                <!-- Staged parts list -->
+                <div v-if="stagedSpareParts.length" class="space-y-1.5 mb-3">
+                  <div v-for="(part, idx) in stagedSpareParts" :key="part.spare_part_id"
+                    class="flex items-center justify-between bg-white border border-blue-100 rounded-lg px-3 py-1.5">
+                    <span class="text-xs text-slate-700 truncate mr-2">{{ part.name }}</span>
+                    <div class="flex items-center gap-1.5 flex-shrink-0">
+                      <span class="text-xs font-semibold text-amber-700 tabular-nums">
+                        {{ part.quantity }} {{ part.unit_short || '' }}
+                      </span>
+                      <button @click="stagedSpareParts.splice(idx, 1)"
+                        class="text-slate-300 hover:text-rose-500 transition-colors">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Search -->
+                <div class="relative mb-2">
+                  <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                  </svg>
+                  <input v-model="addSpSearch" type="text" :placeholder="t('maintenance.sp_search_ph')"
+                    class="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-xl bg-white
+                           focus:outline-none focus:ring-2 focus:ring-blue-300 transition-all" />
+                </div>
+
+                <!-- Available parts list -->
+                <div class="max-h-36 overflow-y-auto border border-slate-100 rounded-xl bg-white">
+                  <div v-if="addSpLoading" class="p-4 text-center text-slate-400 text-xs">...</div>
+                  <div v-else-if="filteredAddSpareParts.length === 0"
+                    class="p-4 text-center text-slate-400 text-xs italic">
+                    {{ t('maintenance.sp_none') }}
+                  </div>
+                  <div v-else>
+                    <div v-for="sp in filteredAddSpareParts" :key="sp.id"
+                      @click="selectAddSp(sp)"
+                      class="flex items-center justify-between px-3 py-2 cursor-pointer transition-colors text-sm"
+                      :class="addSelectedSp?.id === sp.id ? 'bg-indigo-50' : 'hover:bg-slate-50'">
+                      <span class="text-slate-700 truncate mr-2">{{ sp.name }}</span>
+                      <span class="text-xs text-slate-400 flex-shrink-0">
+                        {{ t('maintenance.sp_available') }}:
+                        <span :class="sp.quantity != null && sp.quantity <= 0 ? 'text-rose-500 font-semibold' : 'text-slate-600 font-semibold'">
+                          {{ sp.quantity != null ? sp.quantity : '∞' }}
+                          {{ sp.unit_data?.short_name || sp.unit_data?.name || '' }}
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Quantity input for selected part -->
+                <Transition name="slide-down">
+                  <div v-if="addSelectedSp" class="mt-2 bg-white border border-indigo-100 rounded-xl p-3 space-y-2">
+                    <div class="text-xs font-semibold text-indigo-800">{{ addSelectedSp.name }}</div>
+                    <div class="flex gap-2">
+                      <input v-model.number="addSpQuantity" type="number" min="0.001" step="0.001"
+                        :placeholder="t('maintenance.sp_qty_ph')"
+                        class="flex-1 text-sm border rounded-xl px-3 py-1.5 transition-all focus:outline-none focus:ring-2"
+                        :class="addSpInsufficient
+                          ? 'border-rose-300 bg-rose-50 focus:ring-rose-300'
+                          : 'border-slate-200 focus:ring-indigo-300'" />
+                      <button @click="stageSparePart"
+                        :disabled="!addSpQuantity || addSpQuantity <= 0 || addSpInsufficient"
+                        class="px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700
+                               rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                        {{ t('maintenance.task_add_btn') }}
+                      </button>
+                    </div>
+                    <p v-if="addSpInsufficient" class="text-xs text-rose-600 font-medium">
+                      ⚠ {{ t('maintenance.sp_insufficient') }}.
+                      {{ t('maintenance.sp_available') }}: {{ addSelectedSp.quantity }} {{ addSelectedSp.unit_data?.short_name || '' }}
+                    </p>
+                  </div>
+                </Transition>
+              </div>
+
               <p v-if="formError" class="text-xs text-rose-500">{{ formError }}</p>
               <div class="flex gap-2 pt-1">
                 <button @click="showAddForm = false; resetForm()"
@@ -259,18 +335,20 @@
                 </div>
               </div>
 
-              <!-- Add spare part button — visible to assignee and admin -->
-              <div v-if="!taskItem.is_done && taskItem.is_mine" class="px-3 pb-3">
-                <button @click="openSpModal(taskItem)"
-                  class="flex items-center gap-1.5 text-[11px] font-medium text-indigo-600
-                         hover:text-indigo-700 hover:bg-indigo-50 border border-indigo-100
-                         rounded-lg px-2.5 py-1.5 transition-colors">
-                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
-                  </svg>
-                  {{ t('maintenance.sp_add_btn') }}
+              <!-- Yonlanma toggle -->
+              <div v-if="auth.isAdmin" class="mx-3 mb-3 flex items-center gap-2">
+                <button type="button" @click="toggleBonus(taskItem)" :disabled="taskItem.is_done"
+                  :class="['toggle-switch', taskItem.has_bonus ? 'toggle-switch--on' : '', taskItem.is_done ? 'opacity-50 cursor-not-allowed' : '']">
+                  <span class="toggle-thumb" :class="taskItem.has_bonus ? 'toggle-thumb--on' : ''"></span>
                 </button>
+                <span class="text-xs font-medium text-slate-600">{{ t('maintenance.task_bonus') }}</span>
+                <input v-if="taskItem.has_bonus" v-model.number="taskItem.bonus_amount" type="number" min="0" step="0.01"
+                  :disabled="taskItem.is_done" @change="saveBonusAmount(taskItem)"
+                  :placeholder="t('maintenance.task_bonus_ph')"
+                  class="w-36 text-sm border border-slate-200 rounded-lg px-3 py-1.5
+                         focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all disabled:opacity-50" />
               </div>
+
             </div>
           </div>
         </div>
@@ -301,127 +379,6 @@
         </div>
       </div>
     </template>
-
-    <!-- Spare Parts Modal -->
-    <Transition name="modal">
-      <div v-if="showSpModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div class="absolute inset-0 bg-black/40 backdrop-blur-[2px]" @click="showSpModal = false"></div>
-        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[85vh]">
-
-          <!-- Header -->
-          <div class="px-5 pt-5 pb-3 border-b border-slate-100 flex-shrink-0">
-            <div class="flex items-center justify-between">
-              <h3 class="text-base font-bold text-slate-900">{{ t('maintenance.sp_modal_title') }}</h3>
-              <button @click="showSpModal = false"
-                class="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 transition-colors">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-              </button>
-            </div>
-            <p class="text-xs text-slate-400 mt-0.5 truncate">{{ spModalTask?.title }}</p>
-            <!-- Search -->
-            <div class="relative mt-3">
-              <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-              </svg>
-              <input v-model="spSearch" type="text" :placeholder="t('maintenance.sp_search_ph')"
-                class="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-xl bg-slate-50
-                       focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all" />
-            </div>
-          </div>
-
-          <!-- List -->
-          <div class="flex-1 overflow-y-auto px-3 py-2">
-            <div v-if="sparePartsLoading" class="p-6 text-center text-slate-400 text-sm">...</div>
-            <div v-else-if="filteredSpareParts.length === 0"
-              class="p-6 text-center text-slate-400 text-sm italic">
-              {{ t('maintenance.sp_none') }}
-            </div>
-            <div v-else class="space-y-1">
-              <div v-for="sp in filteredSpareParts" :key="sp.id"
-                @click="selectSp(sp)"
-                class="flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer transition-colors"
-                :class="selectedSp?.id === sp.id
-                  ? 'bg-indigo-50 border border-indigo-200'
-                  : 'hover:bg-slate-50 border border-transparent'">
-                <div class="min-w-0">
-                  <div class="text-sm font-medium text-slate-800 truncate">{{ sp.name }}</div>
-                  <div class="text-xs text-slate-400 mt-0.5">
-                    {{ t('maintenance.sp_available') }}:
-                    <span :class="sp.quantity != null && sp.quantity <= 0 ? 'text-rose-500 font-semibold' : 'text-slate-600 font-semibold'">
-                      {{ sp.quantity != null ? sp.quantity : '∞' }}
-                      {{ sp.unit_data?.short_name || sp.unit_data?.name || '' }}
-                    </span>
-                  </div>
-                </div>
-                <svg v-if="selectedSp?.id === sp.id" class="w-4 h-4 text-indigo-600 flex-shrink-0 ml-2"
-                  fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          <!-- Quantity input (shows when part selected) -->
-          <Transition name="slide-down">
-            <div v-if="selectedSp" class="px-5 pb-4 pt-3 border-t border-slate-100 flex-shrink-0 space-y-3">
-              <div class="bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2">
-                <div class="text-xs text-indigo-400 font-medium">Tanlangan</div>
-                <div class="text-sm font-semibold text-indigo-800 mt-0.5">{{ selectedSp.name }}</div>
-                <div class="text-xs text-indigo-400 mt-0.5">
-                  {{ t('maintenance.sp_available') }}: {{ selectedSp.quantity != null ? selectedSp.quantity : '∞' }}
-                  {{ selectedSp.unit_data?.short_name || '' }}
-                </div>
-              </div>
-
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1.5">
-                  {{ t('maintenance.sp_qty_label') }}
-                  <span v-if="selectedSp.unit_data"> ({{ selectedSp.unit_data.short_name || selectedSp.unit_data.name }})</span>
-                  *
-                </label>
-                <input v-model.number="spQuantity" type="number" min="0.001" step="0.001"
-                  :placeholder="t('maintenance.sp_qty_ph')"
-                  class="w-full text-sm border rounded-xl px-3 py-2 transition-all focus:outline-none focus:ring-2"
-                  :class="spInsufficient
-                    ? 'border-rose-300 bg-rose-50 focus:ring-rose-300'
-                    : 'border-slate-200 focus:ring-indigo-300'" />
-                <p v-if="spInsufficient" class="text-xs text-rose-600 mt-1 font-medium">
-                  ⚠ {{ t('maintenance.sp_insufficient') }}.
-                  {{ t('maintenance.sp_available') }}: {{ selectedSp.quantity }} {{ selectedSp.unit_data?.short_name || '' }}
-                </p>
-              </div>
-
-              <!-- Notes / description -->
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1.5">
-                  Izoh (ixtiyoriy)
-                </label>
-                <textarea v-model="spNotes" rows="2"
-                  placeholder="Nima uchun ishlatildi, qayerga o'rnatildi..."
-                  class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 resize-none
-                         focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all"></textarea>
-              </div>
-
-              <div class="flex gap-2">
-                <button @click="selectedSp = null; spQuantity = ''; spNotes = ''"
-                  class="flex-1 py-2 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">
-                  {{ t('common.cancel') }}
-                </button>
-                <button @click="confirmAddSp"
-                  :disabled="!spQuantity || spQuantity <= 0 || spInsufficient || spSaving"
-                  class="flex-1 py-2 text-sm text-white bg-indigo-600 hover:bg-indigo-700
-                         rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-                  {{ spSaving ? '...' : t('maintenance.task_add_btn') }}
-                </button>
-              </div>
-            </div>
-          </Transition>
-
-        </div>
-      </div>
-    </Transition>
 
     <!-- Complete Modal -->
     <Transition name="modal">
@@ -521,33 +478,104 @@ async function loadAll() {
 // ── Add task form ──
 const showAddForm = ref(false)
 const formError = ref('')
-const newTask = ref({ title: '', assignee: null, due_date: '' })
+const newTask = ref({ assignee: null, due_date: '' })
+
+// Spare parts staged inside the add-task form, submitted together with the task
+const addSpSearch = ref('')
+const addSpLoading = ref(false)
+const addSpareParts = ref([])
+const addSelectedSp = ref(null)
+const addSpQuantity = ref('')
+const stagedSpareParts = ref([])
+
+const filteredAddSpareParts = computed(() => {
+  const q = addSpSearch.value.toLowerCase()
+  const stagedIds = new Set(stagedSpareParts.value.map(p => p.spare_part_id))
+  return addSpareParts.value.filter(sp =>
+    !stagedIds.has(sp.id) && (!q || sp.name.toLowerCase().includes(q))
+  )
+})
+
+const addSpInsufficient = computed(() => {
+  if (!addSelectedSp.value || !addSpQuantity.value) return false
+  const available = addSelectedSp.value.quantity
+  if (available == null) return false
+  return Number(addSpQuantity.value) > Number(available)
+})
 
 function resetForm() {
-  newTask.value = { title: '', assignee: null, due_date: '' }
+  newTask.value = { assignee: null, due_date: '' }
   formError.value = ''
+  addSpSearch.value = ''
+  addSelectedSp.value = null
+  addSpQuantity.value = ''
+  stagedSpareParts.value = []
+}
+
+async function toggleAddForm() {
+  showAddForm.value = !showAddForm.value
+  if (showAddForm.value) {
+    resetForm()
+    addSpLoading.value = true
+    addSpareParts.value = []
+    try {
+      const res = await warehouseApi.list({ page_size: 500, machines: machineId })
+      addSpareParts.value = res.data.results ?? res.data
+    } catch {
+      toast.error(t('toast.load_error'))
+    } finally {
+      addSpLoading.value = false
+    }
+  }
+}
+
+function selectAddSp(sp) {
+  addSelectedSp.value = sp
+  addSpQuantity.value = ''
+}
+
+function stageSparePart() {
+  if (!addSelectedSp.value || !addSpQuantity.value || addSpQuantity.value <= 0 || addSpInsufficient.value) return
+  stagedSpareParts.value.push({
+    spare_part_id: addSelectedSp.value.id,
+    name: addSelectedSp.value.name,
+    quantity: addSpQuantity.value,
+    unit_short: addSelectedSp.value.unit_data?.short_name || addSelectedSp.value.unit_data?.name || '',
+    notes: '',
+  })
+  addSelectedSp.value = null
+  addSpQuantity.value = ''
 }
 
 async function addTask() {
-  if (!newTask.value.title.trim()) {
-    formError.value = t('toast.form_check')
+  if (!newTask.value.assignee) {
+    formError.value = t('maintenance.task_assignee_required')
     return
   }
   saving.value = true
   formError.value = ''
   try {
     const payload = {
-      title: newTask.value.title.trim(),
       assignee: newTask.value.assignee || null,
       due_date: newTask.value.due_date || null,
     }
     const res = await maintenanceApi.addTask(machineId, payload)
-    tasks.value.push(res.data)
+    const createdTask = res.data
+    createdTask.spare_parts_used = []
+    for (const part of stagedSpareParts.value) {
+      const spRes = await maintenanceApi.addTaskSparePart(machineId, createdTask.id, {
+        spare_part: part.spare_part_id,
+        quantity_used: part.quantity,
+        notes: part.notes,
+      })
+      createdTask.spare_parts_used.push(spRes.data)
+    }
+    tasks.value.push(createdTask)
     showAddForm.value = false
     resetForm()
     await refreshSchedule()
-  } catch {
-    toast.error(t('toast.error'))
+  } catch (e) {
+    formError.value = e.response?.data?.detail || t('toast.error')
   } finally {
     saving.value = false
   }
@@ -582,88 +610,38 @@ async function refreshSchedule() {
   } catch { /* silent */ }
 }
 
-// ── Spare Parts Modal ──
-const showSpModal = ref(false)
-const spModalTask = ref(null)
-const spSearch = ref('')
-const sparePartsLoading = ref(false)
-const allSpareParts = ref([])
-const selectedSp = ref(null)
-const spQuantity = ref('')
-const spNotes = ref('')
-const spSaving = ref(false)
-
-const filteredSpareParts = computed(() => {
-  const q = spSearch.value.toLowerCase()
-  return allSpareParts.value.filter(sp =>
-    !q || sp.name.toLowerCase().includes(q)
-  )
-})
-
-const spInsufficient = computed(() => {
-  if (!selectedSp.value || !spQuantity.value) return false
-  const available = selectedSp.value.quantity
-  if (available == null) return false
-  return Number(spQuantity.value) > Number(available)
-})
-
-async function openSpModal(task) {
-  spModalTask.value = task
-  selectedSp.value = null
-  spQuantity.value = ''
-  spNotes.value = ''
-  spSearch.value = ''
-  showSpModal.value = true
-  // Always reload filtered by current machine
-  sparePartsLoading.value = true
-  allSpareParts.value = []
-  try {
-    const res = await warehouseApi.list({ page_size: 500, machines: machineId })
-    allSpareParts.value = res.data.results ?? res.data
-  } catch {
-    toast.error(t('toast.load_error'))
-  } finally {
-    sparePartsLoading.value = false
-  }
-}
-
-function selectSp(sp) {
-  selectedSp.value = sp
-  spQuantity.value = ''
-}
-
-async function confirmAddSp() {
-  if (!spQuantity.value || Number(spQuantity.value) <= 0 || spInsufficient.value) return
-  spSaving.value = true
-  try {
-    const res = await maintenanceApi.addTaskSparePart(machineId, spModalTask.value.id, {
-      spare_part: selectedSp.value.id,
-      quantity_used: spQuantity.value,
-      notes: spNotes.value,
-    })
-    const task = tasks.value.find(t => t.id === spModalTask.value.id)
-    if (task) {
-      if (!task.spare_parts_used) task.spare_parts_used = []
-      task.spare_parts_used.push(res.data)
-    }
-    // Refresh spare parts list to show updated quantities
-    allSpareParts.value = []
-    selectedSp.value = null
-    spQuantity.value = ''
-    spNotes.value = ''
-    showSpModal.value = false
-  } catch (e) {
-    toast.error(e.response?.data?.detail || t('toast.error'))
-  } finally {
-    spSaving.value = false
-  }
-}
-
 async function removeTaskSparePart(task, usage) {
   try {
     await maintenanceApi.removeTaskSparePart(machineId, task.id, usage.id)
     const found = tasks.value.find(x => x.id === task.id)
     if (found) found.spare_parts_used = (found.spare_parts_used || []).filter(s => s.id !== usage.id)
+  } catch {
+    toast.error(t('toast.error'))
+  }
+}
+
+// ── Task bonus (Yonlanma) ──
+async function toggleBonus(taskItem) {
+  const newValue = !taskItem.has_bonus
+  try {
+    const res = await maintenanceApi.toggleTask(machineId, taskItem.id, {
+      has_bonus: newValue,
+      bonus_amount: newValue ? taskItem.bonus_amount : null,
+    })
+    const idx = tasks.value.findIndex(t => t.id === taskItem.id)
+    if (idx !== -1) tasks.value[idx] = res.data
+  } catch {
+    toast.error(t('toast.error'))
+  }
+}
+
+async function saveBonusAmount(taskItem) {
+  try {
+    const res = await maintenanceApi.toggleTask(machineId, taskItem.id, {
+      bonus_amount: taskItem.bonus_amount || null,
+    })
+    const idx = tasks.value.findIndex(t => t.id === taskItem.id)
+    if (idx !== -1) tasks.value[idx] = res.data
   } catch {
     toast.error(t('toast.error'))
   }
@@ -718,6 +696,23 @@ onMounted(loadAll)
          transition-all duration-200 flex-shrink-0 mt-0.5 cursor-pointer;
 }
 .task-check--pending { @apply border-slate-300 hover:border-blue-400 hover:bg-blue-50; }
+
+/* ── Bonus toggle ── */
+.toggle-switch {
+  @apply relative inline-flex items-center w-10 h-6 rounded-full
+         border-2 border-slate-200 bg-slate-100
+         transition-all duration-200 cursor-pointer flex-shrink-0;
+}
+.toggle-switch--on {
+  @apply bg-indigo-500 border-indigo-500;
+}
+.toggle-thumb {
+  @apply absolute left-0.5 w-4 h-4 bg-white rounded-full shadow
+         transition-transform duration-200;
+}
+.toggle-thumb--on {
+  @apply translate-x-4;
+}
 .task-check--done    { @apply bg-emerald-500 border-emerald-500; }
 
 /* ── Transitions ── */

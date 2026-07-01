@@ -2,13 +2,55 @@
   <div class="animate-fade-in space-y-4">
 
     <!-- Header -->
-    <div>
-      <h1 class="text-xl font-bold text-slate-900">{{ t('maintenance.title') }}</h1>
-      <p class="text-xs text-slate-400 mt-0.5">{{ t('maintenance.subtitle') }}</p>
+    <div class="flex items-start justify-between gap-3">
+      <div>
+        <h1 class="text-xl font-bold text-slate-900">{{ t('maintenance.title') }}</h1>
+        <p class="text-xs text-slate-400 mt-0.5">{{ t('maintenance.subtitle') }}</p>
+      </div>
+      <!-- Export button -->
+      <div class="relative flex-shrink-0" ref="exportMenuRef">
+        <button @click="exportMenuOpen = !exportMenuOpen"
+          class="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-slate-200
+                 bg-white hover:bg-indigo-50 hover:border-indigo-300
+                 text-sm font-semibold text-slate-700 hover:text-indigo-700
+                 transition-all duration-150 shadow-sm cursor-pointer select-none">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+          </svg>
+          {{ t('maintenance.export_btn') }}
+          <svg class="w-3.5 h-3.5 transition-transform duration-150" :class="exportMenuOpen ? 'rotate-180' : ''"
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </button>
+        <!-- Dropdown -->
+        <Transition name="notif-drop">
+          <div v-if="exportMenuOpen"
+            class="absolute right-0 top-full mt-1.5 w-48 bg-white rounded-xl border border-slate-200
+                   shadow-xl shadow-slate-200/60 z-30 overflow-hidden py-1">
+            <button @click="openExportFilter('excel')"
+              class="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700
+                     hover:bg-emerald-50 hover:text-emerald-700 transition-colors cursor-pointer text-left">
+              <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+              </svg>
+              {{ t('maintenance.export_excel') }}
+            </button>
+            <button @click="openExportFilter('pdf')"
+              class="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700
+                     hover:bg-rose-50 hover:text-rose-700 transition-colors cursor-pointer text-left">
+              <svg class="w-4 h-4 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+              </svg>
+              {{ t('maintenance.export_pdf') }}
+            </button>
+          </div>
+        </Transition>
+      </div>
     </div>
 
     <!-- Stats row -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3" data-tutorial="stats-row">
       <div class="stat-card border-rose-200 bg-rose-50">
         <div class="stat-value text-rose-600">{{ counts.overdue }}</div>
         <div class="stat-label text-rose-400">{{ t('maintenance.stat_overdue') }}</div>
@@ -38,10 +80,10 @@
     </div>
 
     <!-- Kanban board -->
-    <div class="kanban-board">
+    <div class="kanban-board" data-tutorial="kanban-board">
 
       <!-- 1. Без графика -->
-      <div class="kanban-col">
+      <div class="kanban-col" data-tutorial="col-none">
         <div class="kanban-hdr kanban-hdr--none">
           <div class="flex items-center gap-2">
             <div class="w-2 h-2 rounded-full bg-slate-400"></div>
@@ -53,12 +95,12 @@
           <p v-if="loading" class="kanban-empty">...</p>
           <p v-else-if="filteredNoSchedule.length === 0" class="kanban-empty">{{ t('maintenance.kanban_empty') }}</p>
           <div v-for="m in filteredNoSchedule" :key="m.id"
-            class="kanban-card kanban-card--none group">
+            class="kanban-card kanban-card--none group" data-tutorial="card-none">
             <div class="font-medium text-sm text-slate-800 truncate">{{ m.name }}</div>
             <div class="text-xs text-slate-400 mt-0.5">{{ m.inventory_number }}</div>
             <div v-if="m.workshop_name" class="text-xs text-slate-400 truncate">{{ m.workshop_name }}</div>
             <div class="mt-3">
-              <button @click="openSimpleSchedule(m)"
+              <button @click="openSimpleSchedule(m)" data-tutorial="btn-assign"
                 class="w-full text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700
                        rounded-lg px-3 py-1.5 transition-colors">
                 {{ t('maintenance.kanban_set_schedule') }}
@@ -69,7 +111,7 @@
       </div>
 
       <!-- 2. Муҳлати яқин (near) -->
-      <div class="kanban-col">
+      <div class="kanban-col" data-tutorial="col-near">
         <div class="kanban-hdr kanban-hdr--near">
           <div class="flex items-center gap-2">
             <div class="w-2 h-2 rounded-full bg-yellow-500"></div>
@@ -81,7 +123,7 @@
           <p v-if="loading" class="kanban-empty">...</p>
           <p v-else-if="filteredNear.length === 0" class="kanban-empty">{{ t('maintenance.kanban_empty') }}</p>
           <RouterLink v-for="item in filteredNear" :key="item.machine"
-            :to="`/machines/${item.machine}`"
+            :to="`/machines/${item.machine}`" data-tutorial="card-near"
             class="kanban-card kanban-card--near block relative">
             <!-- Edit btn top-right -->
             <button @click.prevent.stop="openEdit(item)" class="edit-btn" :title="t('maintenance.schedule_edit')">
@@ -108,7 +150,7 @@
       </div>
 
       <!-- 3. Просрочено (overdue) -->
-      <div class="kanban-col">
+      <div class="kanban-col" data-tutorial="col-overdue">
         <div class="kanban-hdr kanban-hdr--overdue">
           <div class="flex items-center gap-2">
             <div class="w-2 h-2 rounded-full bg-rose-500"></div>
@@ -120,7 +162,7 @@
           <p v-if="loading" class="kanban-empty">...</p>
           <p v-else-if="filteredOverdue.length === 0" class="kanban-empty">{{ t('maintenance.kanban_empty') }}</p>
           <RouterLink v-for="item in filteredOverdue" :key="item.machine"
-            :to="`/machines/${item.machine}`"
+            :to="`/machines/${item.machine}`" data-tutorial="card-overdue"
             class="kanban-card kanban-card--overdue block relative">
             <!-- Edit btn top-right -->
             <button @click.prevent.stop="openEdit(item)" class="edit-btn" :title="t('maintenance.schedule_edit')">
@@ -147,7 +189,7 @@
       </div>
 
       <!-- 4. Jarayonda (in_repair) -->
-      <div class="kanban-col">
+      <div class="kanban-col" data-tutorial="col-repair">
         <div class="kanban-hdr kanban-hdr--repair">
           <div class="flex items-center gap-2">
             <div class="w-2 h-2 rounded-full bg-blue-500"></div>
@@ -158,7 +200,7 @@
         <div class="kanban-cards">
           <p v-if="loading" class="kanban-empty">...</p>
           <p v-else-if="filteredInRepair.length === 0" class="kanban-empty">{{ t('maintenance.kanban_empty') }}</p>
-          <div v-for="item in filteredInRepair" :key="item.machine"
+          <div v-for="item in filteredInRepair" :key="item.machine" data-tutorial="card-repair"
             class="kanban-card kanban-card--repair relative">
             <!-- Edit btn top-right -->
             <button @click.stop="openEdit(item)" class="edit-btn" :title="t('maintenance.schedule_edit')">
@@ -222,7 +264,7 @@
       </div>
 
       <!-- 5. В норме (ok) -->
-      <div class="kanban-col">
+      <div class="kanban-col" data-tutorial="col-ok">
         <div class="kanban-hdr kanban-hdr--ok">
           <div class="flex items-center gap-2">
             <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
@@ -234,7 +276,7 @@
           <p v-if="loading" class="kanban-empty">...</p>
           <p v-else-if="filteredOk.length === 0" class="kanban-empty">{{ t('maintenance.kanban_empty') }}</p>
           <RouterLink v-for="item in filteredOk" :key="item.machine"
-            :to="`/machines/${item.machine}`"
+            :to="`/machines/${item.machine}`" data-tutorial="card-ok"
             class="kanban-card kanban-card--ok block relative">
             <!-- Edit btn top-right -->
             <button @click.prevent.stop="openEdit(item)" class="edit-btn" :title="t('maintenance.schedule_edit')">
@@ -564,15 +606,114 @@
       </div>
     </Transition>
 
+    <!-- Export filter modal -->
+    <Transition name="modal">
+      <div v-if="showExportModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-[2px]" @click="showExportModal = false"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-5">
+          <!-- Header -->
+          <div class="flex items-center justify-between">
+            <h3 class="text-base font-bold text-slate-900">{{ t('maintenance.export_filter_title') }}</h3>
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold"
+              :class="exportFormat === 'excel'
+                ? 'bg-emerald-100 text-emerald-700'
+                : 'bg-rose-100 text-rose-700'">
+              {{ exportFormat === 'excel' ? 'Excel' : 'PDF' }}
+            </span>
+          </div>
+
+          <!-- Date range -->
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1.5">{{ t('maintenance.export_date_from') }}</label>
+              <input v-model="exportFilter.date_from" type="date"
+                class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2
+                       focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all"/>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1.5">{{ t('maintenance.export_date_to') }}</label>
+              <input v-model="exportFilter.date_to" type="date"
+                class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2
+                       focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all"/>
+            </div>
+          </div>
+
+          <!-- Workshop -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1.5">{{ t('maintenance.export_workshop') }}</label>
+            <select v-model="exportFilter.workshop_id"
+              class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2
+                     focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all bg-white">
+              <option value="">{{ t('maintenance.export_all') }}</option>
+              <option v-for="ws in workshops" :key="ws.id" :value="ws.id">{{ ws.name }}</option>
+            </select>
+          </div>
+
+          <!-- Machine status -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1.5">{{ t('maintenance.export_status') }}</label>
+            <select v-model="exportFilter.status_id"
+              class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2
+                     focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all bg-white">
+              <option value="">{{ t('maintenance.export_all') }}</option>
+              <option v-for="st in statuses" :key="st.id" :value="st.id">{{ st.name }}</option>
+            </select>
+          </div>
+
+          <!-- Actions -->
+          <div class="flex gap-2 pt-1">
+            <button @click="showExportModal = false"
+              class="flex-1 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">
+              {{ t('common.cancel') }}
+            </button>
+            <button @click="doExport" :disabled="exporting"
+              :class="[
+                'flex-1 py-2.5 text-sm text-white rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-60',
+                exportFormat === 'excel' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700'
+              ]">
+              <svg v-if="exporting" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+              </svg>
+              {{ exporting ? t('maintenance.export_loading') : t('maintenance.export_btn_apply') }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- Help button: always visible, restarts the tutorial -->
+    <button @click="startTutorial" data-tutorial="help-btn"
+      class="fixed bottom-5 right-5 z-40 flex items-center gap-2 px-4 py-2.5 rounded-full
+             bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-lg
+             shadow-indigo-600/30 transition-colors cursor-pointer">
+      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      {{ t('maintenance.tutorial_help') }}
+    </button>
+
+    <TutorialOverlay
+      v-model="tutorialOpen"
+      :steps="tutorialSteps"
+      :prev-label="t('maintenance.tutorial_prev')"
+      :next-label="t('maintenance.tutorial_next')"
+      :skip-label="t('maintenance.tutorial_skip')"
+      :finish-label="t('maintenance.tutorial_finish')"
+      @finish="onTutorialClosed"
+      @skip="onTutorialClosed"
+    />
+
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useToast } from 'vue-toastification'
 import { useI18n } from '@/i18n'
-import { maintenanceApi, machinesApi } from '@/api'
+import { maintenanceApi, machinesApi, workshopsApi, statusesApi } from '@/api'
+import TutorialOverlay from '@/components/common/TutorialOverlay.vue'
 import dayjs from 'dayjs'
 
 const { t } = useI18n()
@@ -585,6 +726,76 @@ const schedules = ref([])
 const allMachines = ref([])
 const intervalOptions = [1, 2, 3, 6, 12]
 const showCustomInterval = ref(false)
+
+// ── Export ──
+const exportMenuRef  = ref(null)
+const exportMenuOpen = ref(false)
+const showExportModal = ref(false)
+const exportFormat   = ref('excel')
+const exporting      = ref(false)
+const workshops      = ref([])
+const statuses       = ref([])
+const exportFilter   = ref({ date_from: '', date_to: '', workshop_id: '', status_id: '' })
+
+function handleExportOutsideClick(e) {
+  if (exportMenuRef.value && !exportMenuRef.value.contains(e.target)) {
+    exportMenuOpen.value = false
+  }
+}
+
+async function openExportFilter(fmt) {
+  exportMenuOpen.value = false
+  exportFormat.value = fmt
+  exportFilter.value = { date_from: '', date_to: '', workshop_id: '', status_id: '' }
+
+  if (!workshops.value.length) {
+    try {
+      const [wsRes, stRes] = await Promise.all([
+        workshopsApi.list({ page_size: 200 }),
+        statusesApi.list({ page_size: 200 }),
+      ])
+      workshops.value = wsRes.data.results || wsRes.data || []
+      statuses.value  = stRes.data.results || stRes.data || []
+    } catch { /* silent */ }
+  }
+
+  showExportModal.value = true
+}
+
+async function doExport() {
+  exporting.value = true
+  try {
+    const params = { export_format: exportFormat.value }
+    if (exportFilter.value.date_from) params.date_from = exportFilter.value.date_from
+    if (exportFilter.value.date_to)   params.date_to   = exportFilter.value.date_to
+    if (exportFilter.value.workshop_id) params.workshop_id = exportFilter.value.workshop_id
+    if (exportFilter.value.status_id)   params.status_id   = exportFilter.value.status_id
+
+    const res = await maintenanceApi.export(params)
+
+    const isExcel = exportFormat.value === 'excel'
+    const mime = isExcel
+      ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      : 'application/pdf'
+    const ext  = isExcel ? 'xlsx' : 'pdf'
+    const ts   = dayjs().format('YYYYMMDD_HHmm')
+
+    const url  = URL.createObjectURL(new Blob([res.data], { type: mime }))
+    const link = document.createElement('a')
+    link.href  = url
+    link.download = `TO_export_${ts}.${ext}`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+
+    showExportModal.value = false
+  } catch {
+    toast.error(t('toast.error'))
+  } finally {
+    exporting.value = false
+  }
+}
 
 // ── Helpers ──
 function formatDate(d) { return d ? dayjs(d).format('DD.MM.YYYY') : '—' }
@@ -936,7 +1147,89 @@ async function doDelete() {
   }
 }
 
-onMounted(loadData)
+// ── Tutorial (first-time onboarding, spotlight) ──
+const TUTORIAL_STORAGE_KEY = 'to_tutorial_completed'
+const tutorialOpen = ref(false)
+const tutorialSteps = computed(() => [
+  {
+    title: t('maintenance.tutorial_title1'),
+    text: t('maintenance.tutorial_step1'),
+    target: ['[data-tutorial="kanban-board"]'],
+  },
+  {
+    title: t('maintenance.tutorial_title2'),
+    text: t('maintenance.tutorial_step2'),
+    target: ['[data-tutorial="col-none"]'],
+  },
+  {
+    title: t('maintenance.tutorial_title3'),
+    text: t('maintenance.tutorial_step3'),
+    target: ['[data-tutorial="btn-assign"]', '[data-tutorial="col-none"]'],
+  },
+  {
+    title: t('maintenance.tutorial_title4'),
+    text: t('maintenance.tutorial_step4'),
+    target: ['[data-tutorial="col-near"]'],
+  },
+  {
+    title: t('maintenance.tutorial_title5'),
+    text: t('maintenance.tutorial_step5'),
+    target: ['[data-tutorial="col-overdue"]'],
+  },
+  {
+    title: t('maintenance.tutorial_title6'),
+    text: t('maintenance.tutorial_step6'),
+    target: ['[data-tutorial="col-repair"]'],
+  },
+  {
+    title: t('maintenance.tutorial_title7'),
+    text: t('maintenance.tutorial_step7'),
+    target: ['[data-tutorial="col-ok"]'],
+  },
+  {
+    title: t('maintenance.tutorial_title8'),
+    text: t('maintenance.tutorial_step8'),
+    target: [
+      '[data-tutorial="card-near"]',
+      '[data-tutorial="card-overdue"]',
+      '[data-tutorial="card-ok"]',
+      '[data-tutorial="card-repair"]',
+      '[data-tutorial="card-none"]',
+    ],
+  },
+  {
+    title: t('maintenance.tutorial_title9'),
+    text: t('maintenance.tutorial_step9'),
+    target: ['[data-tutorial="stats-row"]'],
+  },
+  {
+    title: t('maintenance.tutorial_title10'),
+    text: t('maintenance.tutorial_step10'),
+    target: ['[data-tutorial="help-btn"]'],
+  },
+])
+
+function startTutorial() {
+  tutorialOpen.value = true
+}
+
+function onTutorialClosed() {
+  localStorage.setItem(TUTORIAL_STORAGE_KEY, '1')
+}
+
+onMounted(async () => {
+  await loadData()
+  document.addEventListener('click', handleExportOutsideClick)
+
+  if (!localStorage.getItem(TUTORIAL_STORAGE_KEY)) {
+    await nextTick()
+    startTutorial()
+  }
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleExportOutsideClick)
+})
 </script>
 
 <style scoped>
@@ -1046,4 +1339,10 @@ onMounted(loadData)
 
 .modal-enter-active, .modal-leave-active { transition: opacity 0.2s; }
 .modal-enter-from, .modal-leave-to       { opacity: 0; }
+
+/* ── Export dropdown ── */
+.notif-drop-enter-active { transition: opacity 0.15s, transform 0.15s; }
+.notif-drop-leave-active { transition: opacity 0.1s, transform 0.1s; }
+.notif-drop-enter-from  { opacity: 0; transform: translateY(-6px) scale(0.97); }
+.notif-drop-leave-to    { opacity: 0; transform: translateY(-4px) scale(0.98); }
 </style>
