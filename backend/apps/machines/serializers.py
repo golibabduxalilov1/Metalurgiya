@@ -6,7 +6,7 @@ from rest_framework import serializers
 
 from apps.workshops.models import Workshop, Section
 from apps.employees.models import Employee
-from .models import Machine, MachineType, MachineStatus, MachineStatusHistory, MachineAttachment, MachineAssignment, MaintenanceSchedule, RepairTask, TaskSparePart, MaintenanceHistory
+from .models import Machine, MachineType, MachineStatus, MachineStatusHistory, MachineAttachment, MachineAssignment, MaintenanceSchedule, RepairTask, TaskSparePart, MaintenanceHistory, ExchangeRate
 
 
 class MachineTypeSerializer(serializers.ModelSerializer):
@@ -383,3 +383,9 @@ class ChangeStatusSerializer(serializers.Serializer):
 
         attrs['status'] = status
         return attrs
+
+
+class ExchangeRateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ExchangeRate
+        fields = ['usd_to_som', 'updated_at']

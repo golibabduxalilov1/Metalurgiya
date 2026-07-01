@@ -412,3 +412,24 @@ class TaskSparePart(models.Model):
 
     def __str__(self):
         return f"{self.task} — {self.spare_part} x{self.quantity_used}"
+
+
+class ExchangeRate(models.Model):
+    """So'm/USD kursi — bitta yozuv sifatida saqlanadi"""
+    usd_to_som = models.DecimalField(
+        '1 USD = ? so\'m', max_digits=12, decimal_places=2, default=12700
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'exchange_rate'
+        verbose_name = 'Valyuta kursi'
+        verbose_name_plural = 'Valyuta kurslari'
+
+    def __str__(self):
+        return f"1 USD = {self.usd_to_som} so'm"
+
+    @classmethod
+    def get_current(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj

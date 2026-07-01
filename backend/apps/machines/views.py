@@ -21,7 +21,7 @@ from utils.permissions import IsAdmin, IsAdminOrMaster, IsAdminOrMasterOrOwner
 from .models import (
     Machine, MachineType, MachineStatus,
     MachineStatusHistory, MachineAttachment, MachineAssignment,
-    MaintenanceSchedule, RepairTask, TaskSparePart, MaintenanceHistory
+    MaintenanceSchedule, RepairTask, TaskSparePart, MaintenanceHistory, ExchangeRate
 )
 from .serializers import (
     MachineListSerializer, MachineDetailSerializer, MachineCreateUpdateSerializer,
@@ -29,7 +29,7 @@ from .serializers import (
     MachineAttachmentSerializer, MachineAttachmentCreateSerializer,
     MachineAssignmentSerializer, ChangeStatusSerializer,
     MaintenanceScheduleSerializer, MaintenanceScheduleWriteSerializer, MaintenanceCompleteSerializer,
-    RepairTaskSerializer, TaskSparePartSerializer, MaintenanceHistorySerializer,
+    RepairTaskSerializer, TaskSparePartSerializer, MaintenanceHistorySerializer, ExchangeRateSerializer,
 )
 from .filters import MachineFilter
 from apps.audit.signals import log_action
@@ -105,7 +105,7 @@ class MachineViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         # Read-only actions — any authenticated user
         if self.action in [
-            'list', 'retrieve', 'period_stats', 'export_excel', 'import_template',
+            'list', 'retrieve', 'period_stats', 'export_excel', 'export_costs', 'import_template',
             'status_history', 'maintenance', 'maintenance_tasks',
             'maintenance_task_detail', 'maintenance_task_spare_parts',
             'maintenance_task_spare_part_delete', 'maintenance_history',
@@ -452,6 +452,358 @@ class MachineViewSet(viewsets.ModelViewSet):
 
         ws.freeze_panes = 'A2'
         return wb
+
+    @extend_schema(summary='Экспорт расходов по станкам в Excel/PDF')
+    @action(detail=False, methods=['get'], url_path='export-costs')
+    def export_costs(self, request):
+        from django.utils.dateparse import parse_date
+
+        date_from = request.query_params.get('date_from')
+        date_to = request.query_params.get('date_to')
+        workshop_id = request.query_params.get('workshop_id')
+        status_filter = request.query_params.get('status', 'all')
+        export_format = request.query_params.get('export_format', 'excel')
+
+        machines = list(
+            Machine.objects.filter(deleted_at__isnull=True)
+            .select_related('workshop', 'maintenance_schedule')
+        )
+        if workshop_id:
+            machines = [m for m in machines if str(m.workshop_id) == str(workshop_id)]
+
+        if status_filter != 'all':
+            filtered = []
+            for m in machines:
+                sched = getattr(m, 'maintenance_schedule', None)
+                if status_filter == 'in_repair':
+                    if sched and sched.in_repair:
+                        filtered.append(m)
+                elif status_filter == 'no_schedule':
+                    if not sched:
+                        filtered.append(m)
+                elif status_filter == 'working':
+                    if sched and not sched.in_repair:
+                        filtered.append(m)
+            machines = filtered
+
+        machine_ids = [m.id for m in machines]
+        history_qs = MaintenanceHistory.objects.filter(
+            machine_id__in=machine_ids
+        ).select_related('machine', 'machine__workshop', 'completed_by')
+
+        if date_from:
+            d = parse_date(date_from)
+            if d:
+                history_qs = history_qs.filter(completed_at__date__gte=d)
+        if date_to:
+            d = parse_date(date_to)
+            if d:
+                history_qs = history_qs.filter(completed_at__date__lte=d)
+
+        records = list(history_qs.order_by('machine__name', '-completed_at'))
+
+        costs = {
+            m.id: {
+                'machine': m,
+                'to_cost': Decimal('0'),
+                'bonus_cost': Decimal('0'),
+                'sklad_cost': Decimal('0'),
+            }
+            for m in machines
+        }
+        for rec in records:
+            agg = costs[rec.machine_id]
+            agg['to_cost'] += rec.total_cost
+            for task in rec.tasks_snapshot or []:
+                if task.get('has_bonus'):
+                    try:
+                        agg['bonus_cost'] += Decimal(str(task.get('bonus_amount') or '0'))
+                    except Exception:
+                        pass
+                for sp in task.get('spare_parts') or []:
+                    try:
+                        agg['sklad_cost'] += Decimal(str(sp.get('cost') or '0'))
+                    except Exception:
+                        pass
+
+        machine_rows = sorted(costs.values(), key=lambda x: x['machine'].name)
+
+        if export_format == 'pdf':
+            return self._export_costs_pdf(machine_rows)
+        return self._export_costs_excel(machine_rows, records)
+
+    def _export_costs_excel(self, machine_rows, records):
+        wb = openpyxl.Workbook()
+        border = Border(
+            left=Side(style='thin', color='D1D5DB'), right=Side(style='thin', color='D1D5DB'),
+            top=Side(style='thin', color='D1D5DB'), bottom=Side(style='thin', color='D1D5DB'),
+        )
+
+        hdr_font = Font(name='Arial', bold=True, color='FFFFFF', size=10)
+        hdr_fill = PatternFill(fill_type='solid', fgColor='3B4FC8')
+        hdr_align = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        cell_align = Alignment(vertical='center', wrap_text=True)
+        alt_fill = PatternFill(fill_type='solid', fgColor='F0F4FF')
+        norm_font = Font(name='Arial', size=9)
+        total_font = Font(name='Arial', bold=True, size=10, color='FFFFFF')
+        total_fill = PatternFill(fill_type='solid', fgColor='3B4FC8')
+
+        # ── Лист 1: Расходы станков ──────────────────────────────────────────
+        ws1 = wb.active
+        ws1.title = 'Расходы станков'
+        headers1 = ['Станок', 'Цех', 'Расходы ТО, USD', 'Расходы на доплаты, USD',
+                    'Расходы склада, USD', 'Общие расходы, USD']
+        widths1 = [30, 20, 18, 20, 16, 18]
+
+        ws1.row_dimensions[1].height = 32
+        for c, (h, w) in enumerate(zip(headers1, widths1), 1):
+            cell = ws1.cell(row=1, column=c, value=h)
+            cell.font = hdr_font
+            cell.fill = hdr_fill
+            cell.alignment = hdr_align
+            cell.border = border
+            ws1.column_dimensions[get_column_letter(c)].width = w
+
+        grand_to = Decimal('0')
+        grand_bonus = Decimal('0')
+        grand_sklad = Decimal('0')
+
+        row_i = 2
+        for item in machine_rows:
+            m = item['machine']
+            row_data = [
+                m.name,
+                m.workshop.name if m.workshop else '—',
+                float(item['to_cost']),
+                float(item['bonus_cost']),
+                float(item['sklad_cost']),
+                float(item['to_cost']),
+            ]
+            row_fill = alt_fill if row_i % 2 == 0 else None
+            for c, val in enumerate(row_data, 1):
+                cell = ws1.cell(row=row_i, column=c, value=val)
+                cell.font = norm_font
+                cell.border = border
+                cell.alignment = cell_align
+                if row_fill:
+                    cell.fill = row_fill
+                if c >= 3:
+                    cell.number_format = '#,##0.00'
+                    cell.alignment = Alignment(horizontal='right', vertical='center')
+            grand_to += item['to_cost']
+            grand_bonus += item['bonus_cost']
+            grand_sklad += item['sklad_cost']
+            row_i += 1
+
+        total_row = ['ИТОГО', '', float(grand_to), float(grand_bonus), float(grand_sklad), float(grand_to)]
+        for c, val in enumerate(total_row, 1):
+            cell = ws1.cell(row=row_i, column=c, value=val)
+            cell.font = total_font
+            cell.fill = total_fill
+            cell.border = border
+            cell.alignment = cell_align
+            if c >= 3:
+                cell.number_format = '#,##0.00'
+                cell.alignment = Alignment(horizontal='right', vertical='center')
+
+        ws1.freeze_panes = 'A2'
+
+        # ── Лист 2: История ТО ───────────────────────────────────────────────
+        ws2 = wb.create_sheet('История ТО')
+        headers2 = ['Станок', 'Дата', 'Мастер', 'Запчасти', 'Расход, USD']
+        widths2 = [28, 14, 24, 50, 16]
+
+        ws2.row_dimensions[1].height = 32
+        for c, (h, w) in enumerate(zip(headers2, widths2), 1):
+            cell = ws2.cell(row=1, column=c, value=h)
+            cell.font = hdr_font
+            cell.fill = hdr_fill
+            cell.alignment = hdr_align
+            cell.border = border
+            ws2.column_dimensions[get_column_letter(c)].width = w
+
+        for row_i, rec in enumerate(records, 2):
+            tasks = rec.tasks_snapshot or []
+            assignees = []
+            parts_desc = []
+            for task in tasks:
+                name = task.get('assignee_name')
+                if name and name not in assignees:
+                    assignees.append(name)
+                for sp in task.get('spare_parts') or []:
+                    qty = sp.get('quantity_used', '')
+                    unit = sp.get('unit', '')
+                    cost = sp.get('cost', '0')
+                    parts_desc.append(f"{sp.get('name', '')} x{qty}{unit} ({cost})")
+            usta = ', '.join(assignees) if assignees else (
+                rec.completed_by.get_full_name() if rec.completed_by else '—'
+            )
+            row_data = [
+                rec.machine.name,
+                rec.completed_at.strftime('%d.%m.%Y'),
+                usta,
+                '; '.join(parts_desc) if parts_desc else '—',
+                float(rec.total_cost),
+            ]
+            row_fill = alt_fill if row_i % 2 == 0 else None
+            for c, val in enumerate(row_data, 1):
+                cell = ws2.cell(row=row_i, column=c, value=val)
+                cell.font = norm_font
+                cell.border = border
+                cell.alignment = cell_align
+                if row_fill:
+                    cell.fill = row_fill
+                if c == 5:
+                    cell.number_format = '#,##0.00'
+                    cell.alignment = Alignment(horizontal='right', vertical='center')
+
+        ws2.freeze_panes = 'A2'
+
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        ts = datetime.now().strftime('%Y%m%d_%H%M')
+        response = HttpResponse(
+            buf.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        response['Content-Disposition'] = f'attachment; filename="raskhody_stankov_{ts}.xlsx"'
+        return response
+
+    def _export_costs_pdf(self, machine_rows):
+        from reportlab.lib import colors as rl_colors
+        from reportlab.lib.pagesizes import landscape, A4
+        from reportlab.lib.units import mm
+        from reportlab.platypus import (
+            SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
+        )
+        from reportlab.lib.styles import ParagraphStyle
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+
+        font_name = 'Helvetica'
+        font_bold = 'Helvetica-Bold'
+        font_candidates = [
+            ('C:/Windows/Fonts/arial.ttf', 'C:/Windows/Fonts/arialbd.ttf'),
+            ('/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+             '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf'),
+            ('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+             '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'),
+        ]
+        for reg_path, bold_path in font_candidates:
+            if os.path.exists(reg_path):
+                try:
+                    pdfmetrics.registerFont(TTFont('ExportFont', reg_path))
+                    font_name = 'ExportFont'
+                except Exception:
+                    pass
+                if os.path.exists(bold_path):
+                    try:
+                        pdfmetrics.registerFont(TTFont('ExportFontBold', bold_path))
+                        font_bold = 'ExportFontBold'
+                    except Exception:
+                        pass
+                break
+
+        buf = io.BytesIO()
+        page_w, page_h = landscape(A4)
+        avail_w = page_w - 30 * mm
+
+        doc = SimpleDocTemplate(
+            buf, pagesize=landscape(A4),
+            leftMargin=15*mm, rightMargin=15*mm,
+            topMargin=15*mm, bottomMargin=20*mm,
+        )
+
+        def style(name, **kw):
+            kw.setdefault('fontName', font_name)
+            return ParagraphStyle(name, **kw)
+
+        title_s = style('t', fontName=font_bold, fontSize=14, textColor=rl_colors.HexColor('#1e3a5f'), spaceAfter=4)
+        sub_s = style('s', fontSize=9, textColor=rl_colors.HexColor('#64748b'), spaceAfter=10)
+        sig_s = style('sig', fontSize=9, textColor=rl_colors.HexColor('#374151'), spaceAfter=6)
+
+        now = datetime.now()
+        story = [
+            Paragraph('Lazana — Отчёт по расходам', title_s),
+            Paragraph(f'Дата формирования: {now.strftime("%d.%m.%Y %H:%M")}', sub_s),
+            HRFlowable(width='100%', thickness=1, color=rl_colors.HexColor('#e2e8f0'), spaceAfter=10),
+        ]
+
+        th_bg = rl_colors.HexColor('#3B4FC8')
+        th_fg = rl_colors.white
+        alt_bg = rl_colors.HexColor('#F0F4FF')
+        grid_c = rl_colors.HexColor('#D1D5DB')
+        grand_bg = rl_colors.HexColor('#3B4FC8')
+
+        base_table_style = [
+            ('BACKGROUND', (0, 0), (-1, 0), th_bg),
+            ('TEXTCOLOR', (0, 0), (-1, 0), th_fg),
+            ('FONTNAME', (0, 0), (-1, 0), font_bold),
+            ('FONTSIZE', (0, 0), (-1, 0), 8),
+            ('FONTNAME', (0, 1), (-1, -1), font_name),
+            ('FONTSIZE', (0, 1), (-1, -1), 7.5),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('GRID', (0, 0), (-1, -1), 0.5, grid_c),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('LEFTPADDING', (0, 0), (-1, -1), 5),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+        ]
+
+        headers = ['Станок', 'Цех', 'Расходы ТО', 'Доплаты', 'Расходы склада', 'Общие расходы']
+        widths = [w * avail_w for w in [0.26, 0.18, 0.14, 0.16, 0.12, 0.14]]
+
+        data = [headers]
+        style_cmds = list(base_table_style) + [
+            ('ALIGN', (2, 0), (5, -1), 'RIGHT'),
+        ]
+
+        grand_to = Decimal('0')
+        grand_bonus = Decimal('0')
+        grand_sklad = Decimal('0')
+
+        for i, item in enumerate(machine_rows, 1):
+            m = item['machine']
+            if i % 2 == 0:
+                style_cmds.append(('BACKGROUND', (0, i), (-1, i), alt_bg))
+            data.append([
+                m.name[:35],
+                (m.workshop.name[:20] if m.workshop else '—'),
+                f'{float(item["to_cost"]):.2f}',
+                f'{float(item["bonus_cost"]):.2f}',
+                f'{float(item["sklad_cost"]):.2f}',
+                f'{float(item["to_cost"]):.2f}',
+            ])
+            grand_to += item['to_cost']
+            grand_bonus += item['bonus_cost']
+            grand_sklad += item['sklad_cost']
+
+        data.append(['ИТОГО', '', f'{float(grand_to):.2f}', f'{float(grand_bonus):.2f}',
+                     f'{float(grand_sklad):.2f}', f'{float(grand_to):.2f}'])
+        grand_row = len(data) - 1
+        style_cmds += [
+            ('BACKGROUND', (0, grand_row), (-1, grand_row), grand_bg),
+            ('TEXTCOLOR', (0, grand_row), (-1, grand_row), rl_colors.white),
+            ('FONTNAME', (0, grand_row), (-1, grand_row), font_bold),
+            ('FONTSIZE', (0, grand_row), (-1, grand_row), 9),
+        ]
+
+        table = Table(data, colWidths=widths, repeatRows=1)
+        table.setStyle(TableStyle(style_cmds))
+        story.append(table)
+
+        story.append(Spacer(1, 14*mm))
+        story.append(HRFlowable(width='100%', thickness=0.5, color=rl_colors.HexColor('#CBD5E1'), spaceAfter=8))
+        story.append(Paragraph('Ответственный: _________________________ / _________________________', sig_s))
+        story.append(Paragraph('Дата: _________________________', sig_s))
+
+        doc.build(story)
+        buf.seek(0)
+        ts = now.strftime('%Y%m%d_%H%M')
+        resp = HttpResponse(buf.getvalue(), content_type='application/pdf')
+        resp['Content-Disposition'] = f'attachment; filename="otchet_raskhody_{ts}.pdf"'
+        return resp
 
     @extend_schema(summary='Импорт станков из Excel')
     @action(detail=False, methods=['post'], url_path='import-excel',
@@ -1403,3 +1755,16 @@ class MaintenanceExportView(generics.GenericAPIView):
         resp = HttpResponse(buf.getvalue(), content_type='application/pdf')
         resp['Content-Disposition'] = f'attachment; filename="TO_export_{ts}.pdf"'
         return resp
+
+
+class ExchangeRateView(generics.RetrieveUpdateAPIView):
+    """So'm/USD kursi — barcha foydalanuvchilar o'qiy oladi, faqat admin o'zgartira oladi."""
+    serializer_class = ExchangeRateSerializer
+
+    def get_permissions(self):
+        if self.request.method in ('PUT', 'PATCH'):
+            return [IsAdmin()]
+        return super().get_permissions()
+
+    def get_object(self):
+        return ExchangeRate.get_current()

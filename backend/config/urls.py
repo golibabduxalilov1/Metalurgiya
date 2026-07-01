@@ -24,6 +24,7 @@ api_v1_urlpatterns = [
     path('maintenance/', include('apps.machines.urls.maintenance')),
     path('spare-parts/', include('apps.warehouse.urls')),
     path('dashboard/', __import__('apps.machines.dashboard', fromlist=['DashboardView']).DashboardView.as_view(), name='dashboard'),
+    path('exchange-rate/', __import__('apps.machines.views', fromlist=['ExchangeRateView']).ExchangeRateView.as_view(), name='exchange-rate'),
 ]
 
 urlpatterns = [
