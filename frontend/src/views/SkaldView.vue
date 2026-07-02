@@ -160,20 +160,22 @@
             <div class="flex gap-3">
               <div class="flex-1">
                 <label class="block text-xs font-semibold text-slate-600 mb-1.5">
-                  {{ t('sklad.form_quantity') }}
+                  {{ t('sklad.form_quantity') }} *
                 </label>
                 <input v-model="form.quantity" type="number" min="0" step="0.001"
                   :placeholder="t('sklad.form_quantity_ph')"
-                  class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2
-                         focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all" />
+                  class="w-full text-sm border rounded-xl px-3 py-2
+                         focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all"
+                  :class="formError && form.quantity === '' ? 'border-rose-300' : 'border-slate-200'" />
               </div>
               <div class="w-36">
                 <label class="block text-xs font-semibold text-slate-600 mb-1.5">
-                  {{ t('sklad.form_unit') }}
+                  {{ t('sklad.form_unit') }} *
                 </label>
                 <select v-model="form.unit"
-                  class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white
-                         focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all">
+                  class="w-full text-sm border rounded-xl px-3 py-2 bg-white
+                         focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all"
+                  :class="formError && !form.unit ? 'border-rose-300' : 'border-slate-200'">
                   <option :value="null">—</option>
                   <option v-for="u in allUnits" :key="u.id" :value="u.id">
                     {{ u.short_name ? `${u.name} (${u.short_name})` : u.name }}
@@ -185,12 +187,13 @@
             <!-- Price -->
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1.5">
-                {{ t('sklad.form_price') }}
+                {{ t('sklad.form_price') }} *
               </label>
               <input v-model="form.price" type="number" min="0" step="0.01"
                 :placeholder="t('sklad.form_price_ph')"
-                class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2
-                       focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all" />
+                class="w-full text-sm border rounded-xl px-3 py-2
+                       focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all"
+                :class="formError && form.price === '' ? 'border-rose-300' : 'border-slate-200'" />
               <!-- Unit price preview -->
               <div v-if="form.price && form.quantity && Number(form.quantity) > 0"
                 class="mt-1.5 flex items-center gap-1.5 text-xs text-indigo-600 bg-indigo-50
@@ -452,7 +455,10 @@ function closeModal() {
 }
 
 async function savePart() {
-  if (!form.value.name.trim()) {
+  if (!form.value.name.trim() ||
+      form.value.quantity === '' ||
+      !form.value.unit ||
+      form.value.price === '') {
     formError.value = t('toast.form_check')
     return
   }

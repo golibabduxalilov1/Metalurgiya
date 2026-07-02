@@ -39,7 +39,8 @@ class DashboardView(APIView):
     permission_classes = [IsAdminOrMasterOrOwner]
 
     def get(self, request):
-        from apps.machines.models import Machine, MaintenanceSchedule, MaintenanceHistory, TaskSparePart
+        from apps.machines.models import Machine, MaintenanceSchedule, MaintenanceHistory
+        from apps.warehouse.models import SparePart
         from apps.workshops.models import Workshop
         from django.db.models import Sum
 
@@ -218,25 +219,24 @@ class DashboardView(APIView):
         ))
 
         # ── Warehouse expenses ──
-        wh_qs = TaskSparePart.objects.filter(
-            deducted=True,
+        # Counted at purchase time (when a spare part is added to the warehouse),
+        # not at consumption time — the money is already spent once bought.
+        wh_qs = SparePart.objects.filter(
             created_at__date__gte=date_from,
             created_at__date__lte=date_to,
         )
-        total_wh = float(wh_qs.aggregate(t=Sum('cost'))['t'] or 0)
+        total_wh = float(wh_qs.aggregate(t=Sum('price'))['t'] or 0)
 
         top_parts_raw = list(
-            wh_qs.values('spare_part_id', 'spare_part__name', 'spare_part__unit__short_name', 'spare_part__unit__name')
-            .annotate(total_cost=Sum('cost'), total_qty=Sum('quantity_used'))
-            .order_by('-total_cost')[:5]
+            wh_qs.select_related('unit').order_by('-price')[:5]
         )
         top_spare_parts = [{
-            'id': r['spare_part_id'],
-            'name': r['spare_part__name'],
-            'unit': r['spare_part__unit__short_name'] or r['spare_part__unit__name'] or '',
-            'total_cost': round(float(r['total_cost'] or 0), 2),
-            'total_qty': round(float(r['total_qty'] or 0), 3),
-        } for r in top_parts_raw]
+            'id': p.id,
+            'name': p.name,
+            'unit': (p.unit.short_name or p.unit.name) if p.unit else '',
+            'total_cost': round(float(p.price or 0), 2),
+            'total_qty': round(float(p.quantity or 0), 3),
+        } for p in top_parts_raw]
 
         # ── Total expenses ──
         total_cost = total_to + total_wh
@@ -250,11 +250,10 @@ class DashboardView(APIView):
             ).aggregate(t=Sum('total_cost'))['t'] or 0
         )
         prev_wh = float(
-            TaskSparePart.objects.filter(
-                deducted=True,
+            SparePart.objects.filter(
                 created_at__date__gte=prev_date_from,
                 created_at__date__lte=prev_date_to,
-            ).aggregate(t=Sum('cost'))['t'] or 0
+            ).aggregate(t=Sum('price'))['t'] or 0
         )
         prev_total = prev_to + prev_wh
         change_pct = round((total_cost - prev_total) / prev_total * 100, 1) if prev_total else None

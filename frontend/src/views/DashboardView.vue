@@ -465,7 +465,7 @@
         <!-- Top 5 spare parts -->
         <div class="card overflow-hidden xl:col-span-2">
           <div class="px-5 py-3 border-b border-slate-100">
-            <div class="text-xs font-semibold text-slate-700">Наиболее используемые запчасти (Топ 5)</div>
+            <div class="text-xs font-semibold text-slate-700">Самые дорогие закупки (Топ 5)</div>
           </div>
           <div v-if="loading" class="p-4 space-y-2">
             <div v-for="i in 5" :key="i" class="skeleton h-10 rounded-lg"></div>
@@ -482,7 +482,7 @@
               <div class="flex-1 min-w-0">
                 <div class="text-xs font-semibold text-slate-800 truncate">{{ part.name }}</div>
                 <div class="text-[11px] text-slate-400">
-                  Использовано: {{ fmtQty(part.total_qty) }} {{ part.unit }}
+                  Куплено: {{ fmtQty(part.total_qty) }} {{ part.unit }}
                 </div>
               </div>
               <div class="text-xs font-bold text-emerald-700 flex-shrink-0">${{ fmtNum(part.total_cost) }}</div>
