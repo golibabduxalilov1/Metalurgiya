@@ -27,8 +27,8 @@ class MachineType(models.Model):
 class MachineStatus(models.Model):
     """Справочник статусов станков"""
     class Color(models.TextChoices):
-        GREEN = 'green', 'Зелёный'
-        YELLOW = 'yellow', 'Жёлтый'
+        GREEN = 'green', 'Зеленый'
+        YELLOW = 'yellow', 'Желтый'
         RED = 'red', 'Красный'
         GRAY = 'gray', 'Серый'
         BLUE = 'blue', 'Синий'
@@ -108,7 +108,7 @@ class Machine(models.Model):
     description = models.TextField('Описание / Комментарий', blank=True)
 
     # Soft delete
-    deleted_at = models.DateTimeField('Удалён', null=True, blank=True)
+    deleted_at = models.DateTimeField('Удален', null=True, blank=True)
     deleted_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
         related_name='deleted_machines', null=True, blank=True
@@ -116,7 +116,7 @@ class Machine(models.Model):
 
     # Метаданные
     created_at = models.DateTimeField('Создан', auto_now_add=True)
-    updated_at = models.DateTimeField('Обновлён', auto_now=True)
+    updated_at = models.DateTimeField('Обновлен', auto_now=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
         related_name='created_machines', null=True, blank=True
@@ -206,7 +206,7 @@ class MachineStatusHistory(models.Model):
 
 
 class MachineAttachment(models.Model):
-    """Файлы и документы, прикреплённые к станку"""
+    """Файлы и документы, прикрепленные к станку"""
     ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx']
 
     machine = models.ForeignKey(
@@ -251,8 +251,8 @@ class MachineAssignment(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
         related_name='machine_assignments', null=True, blank=True
     )
-    assigned_at = models.DateTimeField('Закреплён', auto_now_add=True)
-    unassigned_at = models.DateTimeField('Откреплён', null=True, blank=True)
+    assigned_at = models.DateTimeField('Закреплен', auto_now_add=True)
+    unassigned_at = models.DateTimeField('Откреплен', null=True, blank=True)
     is_current = models.BooleanField('Текущее', default=True)
     notes = models.TextField('Примечания', blank=True)
 

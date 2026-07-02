@@ -18,7 +18,7 @@ logger = logging.getLogger('django')
 
 class IsAdmin(permissions.BasePermission):
     """Only administrators"""
-    message = 'Доступ разрешён только администраторам'
+    message = 'Доступ разрешен только администраторам'
 
     def has_permission(self, request, view):
         return (request.user and request.user.is_authenticated
@@ -27,7 +27,7 @@ class IsAdmin(permissions.BasePermission):
 
 class IsAdminOrMaster(permissions.BasePermission):
     """Administrators and masters"""
-    message = 'Доступ разрешён администраторам и мастерам'
+    message = 'Доступ разрешен администраторам и мастерам'
 
     def has_permission(self, request, view):
         if not (request.user and request.user.is_authenticated):

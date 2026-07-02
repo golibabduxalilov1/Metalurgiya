@@ -25,9 +25,9 @@ class Migration(migrations.Migration):
                 ('workplace', models.CharField(blank=True, max_length=100, verbose_name='Рабочее место')),
                 ('assigned_brigade', models.CharField(blank=True, max_length=200, verbose_name='Бригада')),
                 ('description', models.TextField(blank=True, verbose_name='Описание / Комментарий')),
-                ('deleted_at', models.DateTimeField(blank=True, null=True, verbose_name='Удалён')),
+                ('deleted_at', models.DateTimeField(blank=True, null=True, verbose_name='Удален')),
                 ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='Создан')),
-                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Обновлён')),
+                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Обновлен')),
             ],
             options={
                 'verbose_name': 'Станок',
@@ -40,8 +40,8 @@ class Migration(migrations.Migration):
             name='MachineAssignment',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('assigned_at', models.DateTimeField(auto_now_add=True, verbose_name='Закреплён')),
-                ('unassigned_at', models.DateTimeField(blank=True, null=True, verbose_name='Откреплён')),
+                ('assigned_at', models.DateTimeField(auto_now_add=True, verbose_name='Закреплен')),
+                ('unassigned_at', models.DateTimeField(blank=True, null=True, verbose_name='Откреплен')),
                 ('is_current', models.BooleanField(default=True, verbose_name='Текущее')),
                 ('notes', models.TextField(blank=True, verbose_name='Примечания')),
             ],
@@ -75,7 +75,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('name', models.CharField(max_length=100, unique=True, verbose_name='Статус')),
-                ('color', models.CharField(choices=[('green', 'Зелёный'), ('yellow', 'Жёлтый'), ('red', 'Красный'), ('gray', 'Серый'), ('blue', 'Синий')], default='gray', max_length=10, verbose_name='Цвет')),
+                ('color', models.CharField(choices=[('green', 'Зеленый'), ('yellow', 'Желтый'), ('red', 'Красный'), ('gray', 'Серый'), ('blue', 'Синий')], default='gray', max_length=10, verbose_name='Цвет')),
                 ('is_active', models.BooleanField(default=True, verbose_name='Активен')),
                 ('requires_comment', models.BooleanField(default=False, verbose_name='Требует комментарий')),
                 ('sort_order', models.PositiveIntegerField(default=0, verbose_name='Порядок')),

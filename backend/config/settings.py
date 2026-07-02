@@ -180,7 +180,7 @@ CORS_ALLOW_CREDENTIALS = True
 # drf-spectacular (Swagger)
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Machine Registry API',
-    'DESCRIPTION': 'API for Machine Registry System - учёт станочного парка предприятия',
+    'DESCRIPTION': 'API for Machine Registry System - учет станочного парка предприятия',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
     'COMPONENT_SPLIT_REQUEST': True,

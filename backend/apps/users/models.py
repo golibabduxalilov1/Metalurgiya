@@ -41,7 +41,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField('Активен', default=True)
     is_staff = models.BooleanField('Доступ к admin', default=False)
     created_at = models.DateTimeField('Создан', auto_now_add=True)
-    updated_at = models.DateTimeField('Обновлён', auto_now=True)
+    updated_at = models.DateTimeField('Обновлен', auto_now=True)
     last_activity = models.DateTimeField('Последняя активность', null=True, blank=True)
     allowed_sections = models.JSONField('Доступные разделы', null=True, blank=True, default=None)
 

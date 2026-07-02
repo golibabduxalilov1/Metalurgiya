@@ -74,7 +74,7 @@ class MachineStatusViewSet(viewsets.ModelViewSet):
             OpenApiParameter('machine_type', description='ID типа'),
             OpenApiParameter('operator', description='ID оператора'),
             OpenApiParameter('search', description='Поиск по тексту'),
-            OpenApiParameter('include_deleted', description='Включать удалённые', type=bool),
+            OpenApiParameter('include_deleted', description='Включать удаленные', type=bool),
         ]
     ),
     retrieve=extend_schema(summary='Карточка станка'),
@@ -156,9 +156,9 @@ class MachineViewSet(viewsets.ModelViewSet):
         machine.deleted_by = request.user
         machine.save()
         log_action(request.user, 'delete', machine, None, None)
-        return Response({'detail': 'Станок помечен как удалённый'}, status=status.HTTP_200_OK)
+        return Response({'detail': 'Станок помечен как удаленный'}, status=status.HTTP_200_OK)
 
-    @extend_schema(summary='Восстановить удалённый станок')
+    @extend_schema(summary='Восстановить удаленный станок')
     @action(detail=True, methods=['post'])
     def restore(self, request, pk=None):
         machine = Machine.objects.get(pk=pk)
@@ -378,7 +378,7 @@ class MachineViewSet(viewsets.ModelViewSet):
         else:
             machine.assigned_operator = None
             machine.save(update_fields=['assigned_operator', 'updated_at'])
-            return Response({'detail': 'Оператор откреплён'})
+            return Response({'detail': 'Оператор откреплен'})
 
     @extend_schema(summary='Экспорт реестра в Excel')
     @action(detail=False, methods=['get'], url_path='export-excel')
@@ -725,7 +725,7 @@ class MachineViewSet(viewsets.ModelViewSet):
 
         now = datetime.now()
         story = [
-            Paragraph('Lazana — Отчёт по расходам', title_s),
+            Paragraph('Lazana — Отчет по расходам', title_s),
             Paragraph(f'Дата формирования: {now.strftime("%d.%m.%Y %H:%M")}', sub_s),
             HRFlowable(width='100%', thickness=1, color=rl_colors.HexColor('#e2e8f0'), spaceAfter=10),
         ]
@@ -904,7 +904,7 @@ class MachineViewSet(viewsets.ModelViewSet):
             try:
                 schedule = MaintenanceSchedule.objects.get(machine_id=pk)
                 schedule.delete()
-                return Response({'detail': 'График ТО удалён'})
+                return Response({'detail': 'График ТО удален'})
             except MaintenanceSchedule.DoesNotExist:
                 return Response({'detail': 'График ТО не найден'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -1648,7 +1648,7 @@ class MaintenanceExportView(generics.GenericAPIView):
         # ── Table 1: История ТО ──────────────────────────────────────────────
         story.append(Paragraph('История ТО', sec_s))
 
-        t1_headers = ['#', 'Станок', 'Инв. №', 'Цех', 'Выполнил', 'Завершён', 'Инт.', 'Задания', 'USD']
+        t1_headers = ['#', 'Станок', 'Инв. №', 'Цех', 'Выполнил', 'Завершен', 'Инт.', 'Задания', 'USD']
         t1_widths  = [w * avail_w for w in [0.04, 0.19, 0.10, 0.12, 0.16, 0.10, 0.06, 0.09, 0.10]]
 
         t1_data = [t1_headers]

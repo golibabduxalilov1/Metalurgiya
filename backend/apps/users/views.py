@@ -39,7 +39,7 @@ class RefreshTokenView(TokenRefreshView):
 @extend_schema(tags=['auth'])
 class LogoutView(generics.GenericAPIView):
     """
-    Выход из системы. Добавляет refresh токен в чёрный список.
+    Выход из системы. Добавляет refresh токен в черный список.
     """
     permission_classes = [IsAuthenticated]
 
@@ -82,7 +82,7 @@ class ChangePasswordView(generics.GenericAPIView):
         serializer = self.get_serializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response({'detail': 'Пароль успешно изменён'})
+        return Response({'detail': 'Пароль успешно изменен'})
 
 
 @extend_schema(tags=['users'])
